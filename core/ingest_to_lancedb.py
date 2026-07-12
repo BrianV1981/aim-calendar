@@ -12,9 +12,9 @@ OLLAMA_EMBED_URL = "http://localhost:11434/api/embeddings"
 EMBED_MODEL = "nomic-embed-text:latest"
 INPUT_DIR = "conversations"
 
-# Chunking Config (Length-Constrained Accumulator)
-CHUNK_SIZE = 1500
-OVERLAP = 300
+# Chunking Config (RAG 5.21 Length-Constrained Accumulator)
+MIN_CHUNK_SIZE = 500
+MAX_CHUNK_SIZE = 1500
 
 def get_embedding(text: str) -> List[float]:
     """Get vector embedding from local Ollama model."""
@@ -64,26 +64,48 @@ def parse_markdown(filepath: str):
             
     return None, None
 
-def chunk_text(text: str, chunk_size: int, overlap: int) -> List[str]:
-    """A.I.M. standard sliding-window text chunker."""
+def chunk_text(text: str, min_size: int = MIN_CHUNK_SIZE, max_size: int = MAX_CHUNK_SIZE) -> List[str]:
+    """RAG 5.21 Speaker-Boundary Length-Constrained Accumulator."""
     chunks = []
-    start = 0
-    while start < len(text):
-        end = start + chunk_size
-        chunk = text[start:end]
-        # Try to break at a newline or space if we are in the middle of a word
-        if end < len(text):
-            last_newline = chunk.rfind('\n')
-            if last_newline > chunk_size // 2:
-                end = start + last_newline + 1
-                chunk = text[start:end]
+    current_chunk = ""
+    
+    # Split by transcript blocks (e.g. lines starting with timestamp brackets '[')
+    # This acts as a proxy for speaker boundaries/natural pauses.
+    blocks = re.split(r'(?=\n\[)', text)
+    
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+            
+        if len(current_chunk) + len(block) > max_size:
+            if len(current_chunk) >= min_size:
+                # Flush the optimal density chunk to database
+                chunks.append(current_chunk.strip())
+                current_chunk = block
             else:
-                last_space = chunk.rfind(' ')
-                if last_space > chunk_size // 2:
-                    end = start + last_space + 1
-                    chunk = text[start:end]
-        chunks.append(chunk.strip())
-        start = end - overlap
+                # Block is massive, force a hard split to prevent exceeding max
+                if len(block) > max_size:
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    start = 0
+                    while start < len(block):
+                        chunks.append(block[start:start+max_size].strip())
+                        start += max_size
+                    current_chunk = ""
+                else:
+                    current_chunk += "\n" + block
+                    chunks.append(current_chunk.strip())
+                    current_chunk = ""
+        else:
+            if current_chunk:
+                current_chunk += "\n" + block
+            else:
+                current_chunk = block
+                
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+        
     return chunks
 
 def build_database():
@@ -126,7 +148,7 @@ def build_database():
             continue # Skip garbage or malformed files
             
         print(f"[{idx}/{total}] Embedding {filename}...")
-        chunks = chunk_text(transcript, CHUNK_SIZE, OVERLAP)
+        chunks = chunk_text(transcript)
         
         data_to_insert = []
         for chunk in chunks:
