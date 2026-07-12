@@ -1,1 +1,4 @@
 faster-whisper
+requests
+lancedb
+pyarrow
