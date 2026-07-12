@@ -12,9 +12,9 @@ OLLAMA_EMBED_URL = "http://localhost:11434/api/embeddings"
 EMBED_MODEL = "nomic-embed-text:latest"
 INPUT_DIR = "conversations"
 
-# Chunking Config (RAG 5.21 Length-Constrained Accumulator)
-MIN_CHUNK_SIZE = 500
-MAX_CHUNK_SIZE = 1500
+# Chunking Config
+CHUNK_SIZE = 1500
+OVERLAP = 300
 
 def get_embedding(text: str) -> List[float]:
     """Get vector embedding from local Ollama model."""
@@ -64,47 +64,31 @@ def parse_markdown(filepath: str):
             
     return None, None
 
-def chunk_text(text: str, min_size: int = MIN_CHUNK_SIZE, max_size: int = MAX_CHUNK_SIZE) -> List[str]:
-    """RAG 5.21 Speaker-Boundary Length-Constrained Accumulator."""
+def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = OVERLAP) -> List[str]:
+    """Robust sliding-window chunker strictly contained within the individual file."""
     chunks = []
-    current_chunk = ""
-    
-    # Split by transcript blocks (e.g. lines starting with timestamp brackets '[')
-    # This acts as a proxy for speaker boundaries/natural pauses.
-    blocks = re.split(r'(?=\n\[)', text)
-    
-    for block in blocks:
-        block = block.strip()
-        if not block:
-            continue
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunk = text[start:end]
+        
+        # If we are not at the end of the text, try to find a clean break (newline or period)
+        if end < len(text):
+            # Prefer breaking at a newline (which is a Whisper segment boundary)
+            last_newline = chunk.rfind('\n')
+            if last_newline > chunk_size * 0.5:  # Only break if it's in the second half of the chunk
+                end = start + last_newline + 1
+            else:
+                # Fallback to a space
+                last_space = chunk.rfind(' ')
+                if last_space > chunk_size * 0.75:
+                    end = start + last_space + 1
+                    
+        actual_chunk = text[start:end].strip()
+        if actual_chunk:
+            chunks.append(actual_chunk)
             
-        if len(current_chunk) + len(block) > max_size:
-            if len(current_chunk) >= min_size:
-                # Flush the optimal density chunk to database
-                chunks.append(current_chunk.strip())
-                current_chunk = block
-            else:
-                # Block is massive, force a hard split to prevent exceeding max
-                if len(block) > max_size:
-                    if current_chunk:
-                        chunks.append(current_chunk.strip())
-                    start = 0
-                    while start < len(block):
-                        chunks.append(block[start:start+max_size].strip())
-                        start += max_size
-                    current_chunk = ""
-                else:
-                    current_chunk += "\n" + block
-                    chunks.append(current_chunk.strip())
-                    current_chunk = ""
-        else:
-            if current_chunk:
-                current_chunk += "\n" + block
-            else:
-                current_chunk = block
-                
-    if current_chunk:
-        chunks.append(current_chunk.strip())
+        start = end - overlap
         
     return chunks
 
