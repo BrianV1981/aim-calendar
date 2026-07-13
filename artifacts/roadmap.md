@@ -33,6 +33,14 @@ Create an automated pipeline to ingest phone conversation captures (from Talker 
     *   Implement the retrieval logic to find the most relevant conversation chunks.
     *   Use an LLM to synthesize an answer based on the retrieved phone call context.
 
+### Phase 5: Omni-Channel Automation (Phone + SMS)
+*   **Goal:** Create a "set it and forget it" daemon to autonomously ingest and vectorize all future communications.
+*   **Tasks:**
+    *   Configure Android phone to auto-sync Call Audio (`.amr`) and SMS Backups (`.xml`) to Google Drive.
+    *   Implement a daemon that uses `aim-google drive ls --agent` to fetch new files securely.
+    *   Write `core/ingest_sms.py` to parse XML into the identical YAML/Markdown schema used for phone calls.
+    *   Schedule `core/daemon_pipeline.sh` via cron to continuously transcribe, classify, chunk, and embed new data while purging massive source files.
+
 ---
 
 ## ❓ Open Questions for the Operator

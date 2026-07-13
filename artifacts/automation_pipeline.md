@@ -12,18 +12,17 @@ You need a background app on your Android phone to watch the Talker ACR folder a
     *   **Sync Method:** Set it to `Upload Only` (or `Two-way` if you want them deleted off your phone once processed).
     *   **Automation:** Tell the app to sync automatically on Wi-Fi (or mobile data if you have unlimited).
 
-## Step 2: The Server (Google Drive -> Linux Machine)
-On your Linux machine, we will use **`rclone`**, the industry standard for syncing with cloud storage via the terminal.
+## Step 2: Secure Server Retrieval (Cloud to Linux)
+On your Linux machine, we will completely bypass third-party sync apps and use the native `aim-google` CLI to pull files directly from your workspace.
 
-*   **Setup:** You run `rclone config` to link your Google Drive account.
-*   **The Pull:** We create a bash command: `rclone move gdrive:TalkerACR_Ingest /home/kingb/aim-talkeracr/TalkerACR/All/`. 
-    *   *(Note: Using `rclone move` instead of `sync` will automatically delete the file from Google Drive once it safely reaches your Linux machine, preventing cloud storage bloat/fees).*
+*   **The Check:** The daemon runs `aim-google drive ls --agent` to locate any new files in the `TalkerACR_Ingest` Google Drive folder.
+*   **The Pull:** The daemon executes `aim-google drive get <file_id> --agent` to download the audio directly into your `/home/kingb/aim-talkeracr/TalkerACR/All/` directory.
 
 ## Step 3: The Autonomous Pipeline Daemon (Cron Job)
-We wrap our three Python scripts into a single master shell script (`core/daemon_pipeline.sh`) and schedule it to run every hour (or every night at 2:00 AM) via `cron`.
+We wrap our Python and Go scripts into a single master shell script (`core/daemon_pipeline.sh`) and schedule it to run every hour via `cron`.
 
 The daemon will execute perfectly in order:
-1.  **The Fetch:** `rclone move` pulls new `.amr` files from Google Drive.
+1.  **The Fetch:** `aim-google` natively pulls new `.amr` files from Google Drive.
 2.  **Phase 1 (Transcription):** Runs `batch_ingest.py`. Because it's idempotent, it skips the 13k old files instantly and only transcribes the new ones into `.md` files.
 3.  **Phase 2 (Classification):** Runs `classify_calls.py`. The local LLM reads the new `.md` transcripts and tags them as `status: golden` or `status: garbage`.
 4.  **Phase 3 (Semantic RAG):** Runs `ingest_to_lancedb.py`. It ignores the garbage files, slices the golden calls using our Sliding Window chunker, and mathematically embeds them into LanceDB.
@@ -39,4 +38,4 @@ To prevent your Linux hard drive from filling up with massive `.amr` audio files
 ### Implementation Plan
 If you like this architecture:
 1. You can install **DriveSync** on your phone.
-2. I can install **`rclone`** on your Linux machine and write the master `core/daemon_pipeline.sh` script to tie everything together.
+2. I can write the master `core/daemon_pipeline.sh` script to tie everything together natively using your `aim-google` CLI.
