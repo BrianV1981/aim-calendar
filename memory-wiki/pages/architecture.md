@@ -18,7 +18,7 @@ The primary goal of this repository is to process raw communications data (Phone
 
 ### Phase 3: The Exocortex Lifelog (SMS & Call Ingestion)
 **Objective:** Parse Android XML backups (SMS & Call Logs) and stitch them together with the Phase 2 Audio Transcripts into chronological timelines.
-**Process:** The system utilizes a streaming `iterparse` engine to process massive (10GB+) XML files without OOM crashes. It parses texts, calls, and MMS image attachments, interleaving them in exact chronological order into single `YYYY-MM-DD.md` Obsidian-compatible Daily Notes in the `conversations/daily_notes/` directory.
+**Process:** The system utilizes a streaming `iterparse` engine to process massive (10GB+) XML files without OOM crashes. It parses texts, calls, and rich media attachments (images, videos, documents), interleaving them in exact chronological order into single `YYYY-MM-DD.md` generic Markdown Daily Notes in the `conversations/daily_notes/` directory. These are intended for a custom UI or Google Calendar integration, moving beyond standard bidirectional knowledge graphs.
 
 ### Phase 4: LanceDB Vector Injection (Markdown RAG)
 **Objective:** Inject the completely unified Daily Notes into the RAG vector database.

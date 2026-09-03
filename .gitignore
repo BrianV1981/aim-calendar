@@ -1,7 +1,17 @@
-# --- A.I.M. OS Exoskeleton ---
-.aim_core/
-.gemini/
-AGENTS.md
-aim-agy_os/
-memory-wiki/
-workspace/
+
+
+# --- Python & Data ---
+.venv/
+__pycache__/
+*.pyc
+*.lance
+*.tar.gz
+*.mp3
+*.amr
+*.xml
+*.log
+TalkerACR/
+conversations/
+conversations_diarized/
+talker_cartridge.lance/
+joshua_os/venv/

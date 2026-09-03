@@ -13,9 +13,10 @@ Designed for professionals (lawyers, real estate agents, sales teams), it replac
 
 1. **Streaming Android SMS & Call Ingestion:** Uses a custom `iterparse` engine capable of chewing through massive 10GB+ Android XML backups locally without OOM crashing.
 2. **Audio Transcription & Diarization:** Automatically ingests `.amr` and `.mp3` call recordings, transcribes them via Whisper, separates speakers via Pyannote, and maps the audio context into the timeline.
-3. **Visual Translation Cache (MMS):** Extracts Base64 MMS images, pairs them with `locomo-v2` offline vision models (LLaVA/MiniCPM), and injects deep OCR and contextual descriptions directly into the timeline.
-4. **Chronological Daily Notes:** Outputs beautiful, Obsidian-compatible `YYYY-MM-DD.md` files where texts, call durations, images, and transcripts are interleaved in exact chronological order.
-5. **LanceDB Vector RAG:** Natively built to ingest the output into the `aim-memory` Retrieval-Augmented Generation ecosystem, allowing users to execute semantic searches across years of timeline data (e.g., *"What did Ayrianna text me about on Election Day 2020?"*).
+3. **Visual Translation Cache (MMS):** Extracts Base64 MMS payloads (images, videos, vCards, documents), pairs them with `locomo-v2` offline vision models (LLaVA/MiniCPM), and injects deep OCR and contextual descriptions directly into the timeline.
+4. **Chronological Daily Notes:** Outputs beautiful, generic Markdown (`YYYY-MM-DD.md`) files where texts, call durations, rich media, and transcripts are interleaved in exact chronological order. These can be ingested by any MIT-licensed knowledge graph or custom UI to surpass standard bidirectional linking.
+5. **Google Calendar Sync (V1 Goal):** While local-first by design, V1 will fully integrate with Google Calendar as the primary UI. Users can opt to back up their structured data to Google Drive, making the entire Exocortex instantly retrievable and visually accessible via their cloud calendar.
+6. **LanceDB Vector RAG:** Natively built to ingest the output into the `aim-memory` Retrieval-Augmented Generation ecosystem, allowing users to execute semantic searches across years of timeline data.
 
 ---
 
