@@ -2,7 +2,7 @@
 
 The primary goal of this repository is to process raw communications data (Phone Calls, Text Messages) and cleanly map them into the `aim-memory` RAG 5.21 schema for the Joshua OS.
 
-## The 3-Phase Ingestion Pipeline
+## The 4-Phase Ingestion Pipeline
 
 ### Phase 1: Classification (Complete)
 **Objective:** Prevent wasted compute by separating real conversations from noise.
@@ -16,6 +16,10 @@ The primary goal of this repository is to process raw communications data (Phone
 2.  **RAG Chunking:** Parsed the Markdown files, identified individual speaker turns, and merged them into a `[Turn N-1] + [Turn N] + [Turn N+1]` contextual sliding window.
 3.  **Vectorization:** Vectorized via Ollama (`nomic-embed-text`) into a standalone `talker_cartridge.lance` database. *(See [LanceDB Cartridge Generation](lancedb_cartridge.md) for deeper technical notes on avoiding massive disk bloat during this step).*
 
-### Phase 3: SMS Ingestion (Upcoming)
+### Phase 3: SMS Ingestion (In Progress)
 **Objective:** Parse Android "SMS Backup & Restore" XML logs.
 **Process:** The system will parse the XML, group text threads contextually, and vectorize them into an `sms_cartridge.lance` database following the exact same schema.
+
+### Phase 4: The Exocortex Lifelog (Upcoming)
+**Objective:** Stitch the raw outputs of Phase 2 and Phase 3 into a single chronological Daily Note.
+**Process:** The system will generate a master Obsidian Markdown file for every calendar day (e.g., `2026-02-06.md`). It will interleave SMS texts, Call Logs, and Audio Transcripts in exact chronological order, creating a visually readable "timeline of your life" that can be browsed natively via a calendar UI or synced to Google Calendar.
