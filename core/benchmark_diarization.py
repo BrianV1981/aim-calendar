@@ -15,7 +15,12 @@ def get_speaker_for_segment(segment, diarization):
     # Store overlaps: {speaker_label: overlap_duration}
     speaker_overlaps = {}
     
-    for turn, _, speaker in diarization.itertracks(yield_label=True):
+    try:
+        annotation = diarization.speaker_diarization
+    except AttributeError:
+        annotation = diarization
+        
+    for turn, _, speaker in annotation.itertracks(yield_label=True):
         # Calculate overlap
         overlap_start = max(segment_start, turn.start)
         overlap_end = min(segment_end, turn.end)
@@ -46,7 +51,7 @@ def run_diarization():
     try:
         pipeline = Pipeline.from_pretrained(
             "pyannote/speaker-diarization-3.1",
-            use_auth_token=HF_TOKEN
+            token=HF_TOKEN
         )
     except Exception as e:
         print(f"Failed to load Pyannote. Check your HF_TOKEN or access rights: {e}")
@@ -64,9 +69,15 @@ def run_diarization():
             
         print(f"[{idx}/{total}] Diarizing and Transcribing {folder_name}...")
         
+        # Pyannote/Torchaudio has a bug with AMR chunk truncation. Convert to wav first.
+        wav_path = os.path.join(target_dir, "temp_audio.wav")
+        
         try:
-            # 1. Run Pyannote Diarization
-            diarization = pipeline(audio_path)
+            # Convert to 16kHz wav for stable torchaudio decoding
+            os.system(f'ffmpeg -y -i "{audio_path}" -ar 16000 -ac 1 "{wav_path}" -loglevel quiet')
+            
+            # 1. Run Pyannote Diarization on the stable wav file
+            diarization = pipeline(wav_path)
             
             # 2. Run Whisper Transcription
             segments, info = whisper_model.transcribe(
@@ -90,6 +101,9 @@ def run_diarization():
             
         except Exception as e:
             print(f"[{idx}/{total}] Error processing {folder_name}: {e}")
+        finally:
+            if os.path.exists(wav_path):
+                os.remove(wav_path)
 
 if __name__ == "__main__":
     run_diarization()

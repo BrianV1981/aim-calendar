@@ -1,15 +1,15 @@
 import os
-import requests
 import re
 import json
 import time
+from openai import OpenAI
 
 INPUT_DIR = "conversations"
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "qwen3.5:4b"
 
-def ask_ollama(transcript):
-    """Sends the transcript to the local Ollama LLM to classify it."""
+def ask_openai(transcript):
+    """Sends the transcript to OpenAI API to classify it."""
+    client = OpenAI(api_key="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")
+    
     prompt = f"""You are an audio transcript classifier.
 Read the following transcript snippet. Determine if it represents a REAL human conversation or a GARBAGE call (like a voicemail, pocket dial, silent hang-up, or background noise).
 Reply ONLY with the exact word "golden" if it is a real conversation.
@@ -19,19 +19,17 @@ Transcript:
 {transcript}
 """
     
-    data = {
-        "model": MODEL_NAME,
-        "prompt": prompt,
-        "stream": False,
-        "options": {
-            "temperature": 0.0
-        }
-    }
-    
     try:
-        response = requests.post(OLLAMA_URL, json=data, timeout=30)
-        response.raise_for_status()
-        result = response.json().get("response", "").strip().lower()
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.0,
+            max_tokens=10
+        )
+        
+        result = response.choices[0].message.content.strip().lower()
         
         # Clean up any weird punctuation the LLM might have added
         if "golden" in result:
@@ -42,7 +40,7 @@ Transcript:
             return "unknown"
             
     except Exception as e:
-        print(f"Error querying Ollama: {e}")
+        print(f"Error querying OpenAI: {e}")
         return "error"
 
 def classify_files():
@@ -53,7 +51,7 @@ def classify_files():
     files = [f for f in os.listdir(INPUT_DIR) if f.endswith('.md')]
     total = len(files)
     
-    print(f"Starting classification of {total} files using {MODEL_NAME}...")
+    print(f"Starting classification of {total} files using OpenAI gpt-4o-mini...")
     
     processed = 0
     golden = 0
@@ -86,18 +84,16 @@ def classify_files():
             status = "garbage"
         else:
             # We don't need to send the whole file, just the first 1000 characters is usually enough to tell
-            status = ask_ollama(transcript[:1000])
+            status = ask_openai(transcript[:1000])
             
         if status in ["error", "unknown"]:
             print(f"[{idx}/{total}] Failed to classify {filename} (returned {status})")
             continue
             
         # Inject the status into the YAML frontmatter
-        # We replace the closing '---' of the frontmatter with our new tag + closing
         if "---\n\n# Transcript" in content:
             new_content = content.replace("---\n\n# Transcript", f"status: {status}\n---\n\n# Transcript", 1)
         else:
-            # Fallback if format is slightly different
             new_content = content.replace("---\n", f"---\nstatus: {status}\n", 1)
             
         with open(filepath, 'w', encoding='utf-8') as f:
@@ -111,9 +107,6 @@ def classify_files():
             garbage += 1
             
         processed += 1
-        
-        # Small delay to prevent overloading CPU/Ollama
-        time.sleep(0.1)
 
     print("\n=== CLASSIFICATION COMPLETE ===")
     print(f"Total newly classified: {processed}")

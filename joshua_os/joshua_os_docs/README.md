@@ -1,0 +1,33 @@
+# A.I.M. Operating System Protocols (`joshua_os_docs/`)
+
+This directory contains the highly distilled, operational markdown files that define the A.I.M. architecture and behavioral guardrails. These files are extracted and summarized from the deep philosophical lore of the `aim-wiki` repository.
+
+## 🛑 MANDATORY RE-BAKING RULE
+The files in this directory are **not** read natively by the Conscious Agent during standard operation. Instead, they serve as the raw materials for the A.I.M. OS Knowledge Cartridge.
+
+**If you modify, add, or delete ANY file in this directory, you MUST execute the following command to re-compile the Parquet cartridge:**
+
+```bash
+aim bake joshua_os_docs joshua_os_docs.parquet
+```
+
+Once baked, you MUST move the resulting `joshua_os_docs.parquet` file into `assets/default_engrams/joshua_os_docs.parquet` and deploy the changes via GitOps. If you fail to do this, newly initialized agents will be provisioned with an outdated OS handbook and will hallucinate legacy architecture.
+
+---
+
+## Index of Protocol Files
+
+*   **`AIM_CLI_TOOLS.md`**: Maps the core command-line tools (`aim bug`, `aim push`, `aim search`, `aim projects`) that agents must use instead of raw bash commands.
+*   **`BLACKBOX_VAULT.md`**: Details the forensic, Operator-locked anti-tampering archive designed to prevent agents from editing their own session histories.
+*   **`COGNITIVE_ARCHITECTURE.md`**: Maps the flow of data through the system, identifying the Failsafe Layer, Continuity Pulse, LanceDB RAM/ROM, and Sovereign Sync mechanisms.
+*   **`DATAJACK_SWARM.md`**: Outlines the P2P knowledge sharing network, detailing how Parquet cartridges are exported and mounted as Zero-Copy ROM.
+*   **`EUREKA_FARMING.md`**: Defines the self-optimization cycle, instructing agents on hindsight pruning and forging "sweat equity" into exportable skill cartridges.
+*   **`GITOPS_DEPLOYMENT.md`**: The strict version control rules. Forbids raw git commands and mandates the `aim bug` -> `aim fix` -> `aim push` atomic deployment pipeline.
+*   **`HANDOFF_PROTOCOL.md`**: Formalizes the 3-Step handoff sequence that defeats the "Amnesia Problem," detailing the Blackbox Vault, structured handoff document, and Tmux baton pass.
+*   **`HYBRID_SEARCH.md`**: Details the mechanics of the RAG 5.21 engine (Tantivy FTS + Nomic Embeddings + Reciprocal Rank Fusion) and "Sandwich" context expansion.
+*   **`LANCEDB_INGESTION_PROTOCOL.md`**: Explains the 5-stage ingestion pipeline, including multimodal flattening, format shifting, the Length-Constrained Accumulator, and the critical `table.optimize()` compaction protocol for preventing version bloat.
+*   **`PERSISTENT_WIKI.md`**: Establishes the Dual-Search architecture and the rule that Conscious Agents must use the `aim-memory-wiki` skill for Just-In-Time (JIT) synchronous maintenance of the `memory-wiki/` folder, replacing the legacy background daemon.
+*   **`PROJECTS_KANBAN.md`**: Outlines the `aim projects` wrapper and the strict protocol for agents to claim and ship work natively on the shared GitHub Kanban board.
+*   **`SCRIPT_MAP.md`**: A literal, file-by-file directory map of every Python engine, CLI router, and maintenance script operating in the `aim_core/` folder.
+*   **`TESTING_AND_VALIDATION.md`**: Enforces the "TDD Reflex" and forbids "Vibe Coding." Mandates that all architectural changes must be empirically proven by automated tests before deployment.
+*   **`PROJECT_AUDIT.md`**: Full project health audit (2026-07-11): packaging, CI, repo hygiene, dual memory paths, remediation backlog, and graded assessment.
