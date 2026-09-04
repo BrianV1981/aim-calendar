@@ -40,3 +40,12 @@ Agent protocol: read board → claim with `in-progress` → work via `aim fix` �
 * **`aim doctor`**: Validates the host environment, checking for correct Python versions and LanceDB dependencies.
 * **`aim reincarnate`**: Triggers the Reincarnation Protocol to handoff context securely to a new agent session.
 * **`aim delegate`**: Spawns parallel sub-agents (the RLM pattern) to execute multi-file analysis simultaneously.
+
+## 4. Data Ingestion & Daemons
+* **`core/sync_daemon.sh`**: Automates Google Drive communication synchronization (`rclone copy`) for TalkerACR audio and SMS backups (`sms_raw/`). Detects new files and incrementally triggers downstream ingestion pipelines (`core/ingest_sms.py`, `core/batch_diarize.py`).
+  - Flag `--once`: Executes a single sync-and-trigger cycle (default, ideal for cron/systemd).
+  - Flag `--loop [interval]`: Runs daemon continuously in a loop.
+  - Flag `--dry-run`: Simulates rclone sync without mutating disk or running pipelines.
+  - Flag `--install-systemd`: Installs and activates systemd user timer (`aim-sync.timer`) running every 15 minutes.
+  - Flag `--install-cron`: Outputs the crontab configuration line.
+  - Flag `--status`: Inspects active lockfile, systemd timer status, and recent log entries.
