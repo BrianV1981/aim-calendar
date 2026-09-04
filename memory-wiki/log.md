@@ -17,3 +17,9 @@
 *   Processed an 11.2GB SMS Android backup. Implemented `xml.etree.ElementTree.iterparse` to stream the data, preventing OOM crashes, resulting in the successful extraction of 32,000+ texts and the generation of 2,031 Chronological Daily Notes.
 *   Documented the Multimodal MMS Architecture linking the timeline to the `locomo-v2` Visual Translation Cache.
 *   Updated `index.md`, `pages/architecture.md`, and created `pages/mms_multimodal_translation.md`.
+
+## [2026-09-04] ingest | Data Blindspots & Sync Daemon Necessity
+*   Confirmed that LanceDB queries are strictly limited to the date of the last diarized batch (currently July 10, 2026).
+*   Identified that new data (e.g., August 18th calls) cannot be retrieved by agents until Issue #4 (Background Sync Daemon) pulls the raw files locally, and Phase 2 (Diarization) processes them.
+*   Verified that the 11GB XML backup explicitly contains non-image rich media (`video/mp4`, `audio/amr`, `application/pdf`, `text/vcard`), mathematically validating the necessity of the MMS Multimodal Pipeline (Issue #1).
+*   Updated `pages/architecture.md` to explicitly state the boundaries of the RAG retrieval window based on sync status.

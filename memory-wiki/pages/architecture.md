@@ -23,3 +23,13 @@ The primary goal of this repository is to process raw communications data (Phone
 ### Phase 4: LanceDB Vector Injection (Markdown RAG)
 **Objective:** Inject the completely unified Daily Notes into the RAG vector database.
 **Process:** The system parses the compiled `YYYY-MM-DD.md` Daily Notes, chunks them appropriately, and embeds them into the `talker_cartridge.lance` database. This ensures the RAG agent has full semantic context across audio, texts, and dates simultaneously.
+
+---
+
+## Temporal Data Boundaries & Sync Necessity
+
+Agents relying on LanceDB (`talker_cartridge.lance`) for RAG retrieval must understand the **temporal horizon** of the dataset.
+
+*   **The Horizon Limit:** A LanceDB query will only return results up to the date of the last successful Phase 2 execution. If a user asks about a conversation that occurred *after* the last sync date, the system is fundamentally blind to it.
+*   **The Sync Daemon (Issue #4):** To resolve this, the architecture requires an automated background daemon (e.g., via `rclone`) to continuously pull new raw audio and SMS XML files from cloud storage (Google Drive) into the local `TalkerACR/` and `sms_raw/` directories, respectively.
+*   **Continuous Integration:** Once synced, the pipeline (Phases 1-4) must be re-run incrementally to encode the new timeline into the vector database. Without the sync daemon, the agent's memory is permanently trapped in the past.
