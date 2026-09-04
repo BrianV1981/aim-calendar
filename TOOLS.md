@@ -49,3 +49,9 @@ Agent protocol: read board → claim with `in-progress` → work via `aim fix` �
   - Flag `--install-systemd`: Installs and activates systemd user timer (`aim-sync.timer`) running every 15 minutes.
   - Flag `--install-cron`: Outputs the crontab configuration line.
   - Flag `--status`: Inspects active lockfile, systemd timer status, and recent log entries.
+* **`core/ingest_to_lancedb.py`**: Ingests chronological Daily Notes (`conversations/daily_notes/YYYY-MM-DD.md`) into `talker_cartridge.lance` table `fragments` (`type: "daily_note"`).
+  - Flags: `--limit <n>`, `--recent <n>`, `--file <path>`, `--dry-run`, `--force`, `--batch-size <n>`.
+  - Temporal Sliding Window Chunker: Anchors each chunk with `[Date: YYYY-MM-DD]` and groups multi-line entries (calls, texts, rich media markdown references).
+  - Idempotent Vector Injection: Queries existing `session_id`s in LanceDB before embedding to avoid redundant processing.
+  - Full-Text & Vector Search: Generates 768-dim `nomic-embed-text` vectors, performs table optimization, and builds FTS index on `content`.
+

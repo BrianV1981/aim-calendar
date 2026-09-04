@@ -195,6 +195,12 @@ trigger_downstream_pipelines() {
             (cd "$REPO_ROOT" && "$PYTHON_BIN" "core/ingest_sms.py" >> "$LOG_FILE" 2>&1) || {
                 log "[WARN] core/ingest_sms.py finished with warnings/errors (see $LOG_FILE)."
             }
+            if [ -f "${REPO_ROOT}/core/ingest_to_lancedb.py" ]; then
+                log "[PIPELINE] Running core/ingest_to_lancedb.py (LanceDB vector injection)..."
+                (cd "$REPO_ROOT" && "$PYTHON_BIN" "core/ingest_to_lancedb.py" >> "$LOG_FILE" 2>&1) || {
+                    log "[WARN] core/ingest_to_lancedb.py finished with warnings/errors (see $LOG_FILE)."
+                }
+            fi
         else
             log "[WARN] core/ingest_sms.py not found. Skipping SMS pipeline."
         fi
