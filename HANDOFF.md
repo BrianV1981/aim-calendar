@@ -15,7 +15,9 @@
 | ab0e0351 | **Data Boundary Diagnosis:** Investigated LanceDB blindspots. Proved that LanceDB cannot answer queries about August/September because the `talker_cartridge.lance` vector DB only contains audio processed up to July 10, 2026. The new audio doesn't even exist on the local drive yet. | ✅ RESOLVED |
 | 46a36164 | **Issue #4 (Background Sync Daemon):** Implemented `core/sync_daemon.sh` with rclone syncing for audio and SMS, auto-unzipping, flock lock safety, systemd user service/timer (`aim-sync.timer` running every 15m), and comprehensive 8-test suite in `core/test_sync_daemon.py`. Promoted to `main`. | ✅ RESOLVED |
 | 46a36164 | **Issue #1 (MMS Base64 Extraction):** Refactored `core/ingest_sms.py` to stream-parse `<mms>` tags, extract Base64 rich media payloads (images, video, audio, PDFs) into `conversations/media/` with MD5 hash deduplication, embed relative Markdown links, and preserve multiline entries in chronological sorting. Tested with 6 unit tests in `core/test_ingest_sms.py`. Promoted to `main`. | ✅ RESOLVED |
-| 46a36164 | **Issue #5 (Wiki Architecture Update):** Updated `memory-wiki/pages/architecture.md` to formalize Phase 3 MMS extraction and Phase 5 sync daemon. Promoted to `main`. | ✅ RESOLVED |
+| 46a36164 | **Issue #2 (LanceDB Daily Notes Vector Injection):** Implemented `core/ingest_to_lancedb.py` with sliding window temporal chunking, date anchoring (`[Date: YYYY-MM-DD]`), multiline bullet group preservation, idempotent session tracking against `talker_cartridge.lance` table `fragments` (`type: "daily_note"`), 768-dim `nomic-embed-text` embeddings, table optimization, and FTS indexing. Tested with 3 unit tests in `core/test_ingest_to_lancedb.py`. Promoted to `main`. | ✅ RESOLVED |
+| 46a36164 | **Issue #3 (Obsidian Calendar UI & Vault Integration):** Implemented `core/obsidian_vault.py` with turnkey `.obsidian/` vault generation, Liam Cain's official Calendar community plugin preconfigured, and standardized YAML frontmatter across 2,031 Daily Notes with tags (`daily-note`, `calendar`, `timeline`, `exocortex`). Tested with 6 unit tests in `core/test_obsidian_vault.py`. Promoted to `main`. | ✅ RESOLVED |
+| 46a36164 | **Issues #5 & #7 (Memory Wiki Architecture Updates):** Formalized architecture and operational runbooks in `memory-wiki/pages/architecture.md` and `memory-wiki/pages/obsidian_calendar_integration.md`. Promoted to `main`. | ✅ RESOLVED |
 
 ---
 
@@ -25,29 +27,34 @@ A.I.M. Calendar (Actual Intelligent Memory Calendar) is an Enterprise Exocortex 
 ### Your Knowledge Base
 *   **Root Documentation:** `/home/kingb/aim-talkeracr/memory-wiki/index.md`
 *   **Architecture:** `/home/kingb/aim-talkeracr/memory-wiki/pages/architecture.md`
+*   **Obsidian Integration:** `/home/kingb/aim-talkeracr/memory-wiki/pages/obsidian_calendar_integration.md`
 *   **MMS Translation Pipeline:** `/home/kingb/aim-talkeracr/memory-wiki/pages/mms_multimodal_translation.md`
 *   **Tools Registry:** `/home/kingb/aim-talkeracr/TOOLS.md`
 *   **Joshua OS Rules:** `/home/kingb/aim-talkeracr/AGENTS.md` (MUST READ for GitOps workflow `aim fix` / `aim promote`)
 
 ---
 
-## 2. NEXT MISSION: LANCEDB VECTOR INJECTION (PHASE 3 / ISSUE #2)
-Now that raw data syncs continuously (Issue #4) and texts/calls/MMS are parsed into `conversations/daily_notes/` (Issue #1), the next blocker is embedding the compiled `YYYY-MM-DD.md` Daily Notes into `talker_cartridge.lance` so the RAG agent has full semantic context across calls, texts, and dates simultaneously.
-
-### Open Issues on GitHub:
-*   **Issue #2:** Phase 3: LanceDB Vector Injection (Markdown RAG)
-*   **Issue #3:** Phase 4: Obsidian Calendar UI / Vault Integration
+## 2. CURRENT MISSION STATUS: ALL ISSUES CLOSED (100% PASSING)
+All foundational issues in the milestone are completely implemented, empirically tested, and promoted to `main`:
+*   **Issue #4:** ✅ Closed (Background Sync Daemon)
+*   **Issue #1:** ✅ Closed (Multimodal MMS Translation Pipeline)
+*   **Issue #2:** ✅ Closed (LanceDB Vector Injection - Markdown RAG)
+*   **Issue #3:** ✅ Closed (Obsidian Calendar UI / Vault Integration)
+*   **Issue #5:** ✅ Closed (Wiki Architecture Update)
+*   **Issue #6:** ✅ Closed (Ingestion Gaps Documentation)
+*   **Issue #7:** ✅ Closed (Wiki Update for RAG & Obsidian)
 
 ---
 
 ## 3. HOW TO RUN THE TEST SUITES
-Both test suites are verified passing on `main`:
+All 23 unit tests across 4 test suites are verified 100% passing on `main`:
 ```bash
-python3 -m unittest core/test_ingest_sms.py
-python3 core/test_sync_daemon.py
+python3 -m unittest core/test_sync_daemon.py core/test_ingest_sms.py core/test_ingest_to_lancedb.py core/test_obsidian_vault.py
 ```
 
-## 4. HOW TO RUN SYNC & INGESTION
+## 4. OPERATIONAL RUNBOOK
+
+### Sync & Ingestion
 ```bash
 # Check sync status
 core/sync_daemon.sh --status
@@ -55,9 +62,25 @@ core/sync_daemon.sh --status
 # Dry-run sync
 core/sync_daemon.sh --once --dry-run
 
-# Run full sync cycle
+# Run full sync cycle (auto-runs ingest_sms.py and ingest_to_lancedb.py)
 core/sync_daemon.sh --once
 
 # Install 15-minute background systemd timer
 core/sync_daemon.sh --install-systemd
 ```
+
+### LanceDB Vector Ingestion
+```bash
+# Ingest recent daily notes (idempotent)
+python3 core/ingest_to_lancedb.py --recent 10
+
+# Dry-run injection
+python3 core/ingest_to_lancedb.py --dry-run --recent 5
+```
+
+### Obsidian Vault & Calendar UI
+```bash
+# Initialize vault and migrate frontmatter tags across all Daily Notes
+python3 core/obsidian_vault.py --migrate-tags
+```
+
