@@ -55,3 +55,11 @@ Agent protocol: read board → claim with `in-progress` → work via `aim fix` �
   - Idempotent Vector Injection: Queries existing `session_id`s in LanceDB before embedding to avoid redundant processing.
   - Full-Text & Vector Search: Generates 768-dim `nomic-embed-text` vectors, performs table optimization, and builds FTS index on `content`.
 
+## 5. UI & Obsidian Vault Integration
+* **`core/obsidian_vault.py`**: Initializes formal Obsidian Vault structures (`.obsidian/`) and ensures chronological Daily Notes contain YAML frontmatter tags for native Obsidian Calendar timeline rendering.
+  - Flags: `--vault-dir <path>`, `--daily-notes-dir <path>`, `--media-dir <path>`, `--migrate-tags`, `--dry-run`, `--no-plugin`.
+  - Installs Liam Cain's official Calendar community plugin (`manifest.json`, `data.json`, `main.js`) preconfigured with week starting on Sunday and 250 words per dot.
+  - Configures `core-plugins.json`, `daily-notes.json`, and `app.json` (pointing attachments to `media/` and daily notes to `daily_notes/`).
+  - Idempotently scans and migrates existing Daily Notes frontmatter with tags: `[daily-note, calendar, timeline, exocortex]`.
+
+
