@@ -2,8 +2,22 @@
 ROOT="$(dirname "$(readlink -f "$0")")"
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"
 
-# 1. Execute Core Engine
-"$ROOT/joshua_os/venv/bin/python3" "$ROOT/joshua_os/.aim_core/aim_cli.py" "$@"
+# 1. Execute Core Engine (supporting git worktrees)
+PYTHON_BIN="$ROOT/joshua_os/venv/bin/python3"
+if [ ! -x "$PYTHON_BIN" ]; then
+    GIT_COMMON="$(git -C "$ROOT" rev-parse --git-common-dir 2>/dev/null)"
+    if [ -n "$GIT_COMMON" ]; then
+        MAIN_ROOT="$(dirname "$GIT_COMMON")"
+        if [ -x "$MAIN_ROOT/joshua_os/venv/bin/python3" ]; then
+            PYTHON_BIN="$MAIN_ROOT/joshua_os/venv/bin/python3"
+        fi
+    fi
+fi
+if [ ! -x "$PYTHON_BIN" ]; then
+    PYTHON_BIN="python3"
+fi
+
+"$PYTHON_BIN" "$ROOT/joshua_os/.aim_core/aim_cli.py" "$@"
 EXIT_CODE=$?
 
 # 2. Teardown Hook: Commit memory state to local ledger (Issue 15)
