@@ -20,13 +20,17 @@ The primary goal of this repository is to process raw communications data (Phone
 **Objective:** Parse Android XML backups (SMS, MMS & Call Logs) and stitch them together with the Phase 2 Audio Transcripts into chronological timelines.
 **Process:** The system utilizes a streaming `iterparse` engine (`core/ingest_sms.py`) to process massive (10GB+) XML files without OOM crashes. It parses texts, calls, and decodes Base64 rich media attachments (images, videos, documents, audio) from `<mms>` tags into `conversations/media/` with MD5 payload deduplication. It interleaves all communications in exact chronological order into single `YYYY-MM-DD.md` generic Markdown Daily Notes in `conversations/daily_notes/` while preserving multi-line media references and captions.
 
-### Phase 4: LanceDB Vector Injection (Markdown RAG)
+### Phase 4: LanceDB Vector Injection (Markdown RAG) (Complete)
 **Objective:** Inject the completely unified Daily Notes into the RAG vector database.
-**Process:** The system parses the compiled `YYYY-MM-DD.md` Daily Notes, chunks them appropriately, and embeds them into the `talker_cartridge.lance` database. This ensures the RAG agent has full semantic context across audio, texts, and dates simultaneously.
+**Process:** The system utilizes `core/ingest_to_lancedb.py` to parse chronological Daily Notes (`YYYY-MM-DD.md`), apply sliding-window chunking anchored with `[Date: YYYY-MM-DD]`, preserve multi-line entry blocks, and generate 768-dim `nomic-embed-text` embeddings. Vectors are inserted into `talker_cartridge.lance` under table `fragments` (`type: "daily_note"`) with full idempotency tracking, table optimization, and FTS indexing. This allows semantic retrieval across dates, SMS, calls, and transcripts simultaneously.
 
 ### Phase 5: Background Sync Daemon (Complete)
 **Objective:** Eliminate manual sync steps by continuously synchronizing cloud backups to the local filesystem.
-**Process:** The background sync daemon (`core/sync_daemon.sh`) orchestrates `rclone` synchronization from Google Drive into `TalkerACR/` and `conversations/sms_raw/`. It features flock-based lock safety, auto-unzipping of new archive backups, user-level systemd timer integration (`aim-sync.timer`, running every 15 minutes), and automatic incremental downstream pipeline triggering when new communications records are detected.
+**Process:** The background sync daemon (`core/sync_daemon.sh`) orchestrates `rclone` synchronization from Google Drive into `TalkerACR/` and `conversations/sms_raw/`. It features flock-based lock safety, auto-unzipping of new archive backups, user-level systemd timer integration (`aim-sync.timer`, running every 15 minutes), and automatic incremental downstream pipeline triggering (`core/ingest_sms.py` -> `core/ingest_to_lancedb.py`) when new communications records are detected.
+
+### Phase 6: Obsidian Calendar UI & Vault Integration (Complete)
+**Objective:** Provide a frictionless, beautiful graphical timeline for browsing communications logs.
+**Process:** The vault integration engine (`core/obsidian_vault.py`) provisions a complete Obsidian Vault structure (`.obsidian/`), installs and activates Liam Cain's official Calendar community plugin preconfigured for daily notes (weeks starting on Sunday, 250 words per dot), configures native Markdown links and attachment folder mapping to `conversations/media/`, and standardizes YAML frontmatter across 2,000+ Daily Notes with tags (`daily-note`, `calendar`, `timeline`, `exocortex`).
 
 ---
 
