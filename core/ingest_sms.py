@@ -41,7 +41,17 @@ def append_to_daily_files(buffer, output_dir):
 
         with open(md_path, "w", encoding="utf-8") as f:
             if not existing_content:
-                f.write(f"---\ndate: {day_key}\ntype: daily_exocortex\n---\n")
+                f.write(
+                    f"---\n"
+                    f"date: {day_key}\n"
+                    f"type: daily_exocortex\n"
+                    f"tags:\n"
+                    f"  - daily-note\n"
+                    f"  - calendar\n"
+                    f"  - timeline\n"
+                    f"  - exocortex\n"
+                    f"---\n"
+                )
                 f.write(f"# Daily Log: {day_key}\n\n")
             else:
                 f.write(existing_content)

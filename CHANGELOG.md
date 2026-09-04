@@ -12,12 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Background Sync Daemon (Issue #4):** Implemented `core/sync_daemon.sh` to automate rclone cloud synchronization from Google Drive into `TalkerACR/` and `conversations/sms_raw/` with systemd timer integration (`aim-sync.timer`) and downstream pipeline triggers.
 - **Multimodal MMS Extraction Pipeline (Issue #1):** Refactored `core/ingest_sms.py` to stream and extract Base64 rich media payloads from `<mms>` tags into `conversations/media/` with MD5 hash deduplication, relative Markdown links (`![MMS Image](...)`), and multiline-preserving chronological sorting.
 - **LanceDB Vector Injection for Daily Notes (Issue #2):** Implemented `core/ingest_to_lancedb.py` with sliding window temporal chunking, date anchoring (`[Date: YYYY-MM-DD]`), multiline bullet group preservation, idempotent session tracking against `talker_cartridge.lance` table `fragments` (`type: "daily_note"`), 768-dim `nomic-embed-text` embeddings, table optimization, and FTS indexing.
+- **Obsidian Calendar UI & Vault Integration (Issue #3):** Implemented `core/obsidian_vault.py` to deploy formal Obsidian Vault configurations (`.obsidian/`), install Liam Cain's official Calendar community plugin preconfigured for Daily Notes timelines, and idempotently migrate frontmatter across 2,000+ Daily Notes with calendar tags (`daily-note`, `calendar`, `timeline`, `exocortex`).
 
 ### Changed
 - Replaced the default Git branch from `master` to `main`.
 - Cleaned up obsolete documentation (`TOOLS.md`).
 - Integrated automated downstream LanceDB vector injection into `core/sync_daemon.sh`.
+- Updated `core/ingest_sms.py` to automatically include Obsidian Calendar tags when generating new Daily Notes.
 
-### Planned (Phase 4 & 5)
-- Issue #3: Phase 4: Obsidian Calendar UI / Vault Integration.
+### Planned (Phase 5)
 - Phase 5: Offline visual translation with locomo-v2 for OCR/captioning of extracted media.
