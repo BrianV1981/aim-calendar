@@ -7,7 +7,8 @@ import json
 import argparse
 import traceback
 
-sys.path.append("/home/kingb/aim-memory")
+aim_memory_path = os.environ.get("AIM_MEMORY_PATH", "../aim-memory")
+sys.path.append(os.path.abspath(aim_memory_path))
 try:
     from aim_memory import MemoryClient
     from aim_memory.embeddings import get_embedding
