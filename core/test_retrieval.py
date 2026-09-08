@@ -1,7 +1,9 @@
 import sys
+import os
 import lancedb
 import json
-sys.path.append("/home/kingb/aim-memory")
+aim_memory_path = os.environ.get("AIM_MEMORY_PATH", "../aim-memory")
+sys.path.append(os.path.abspath(aim_memory_path))
 from aim_memory.embeddings import get_embedding
 
 db = lancedb.connect("./talker_cartridge.lance")
