@@ -25,7 +25,8 @@ LANCEDB_SCHEMA = pa.schema([
 
 # Attempt import of aim_memory embeddings
 try:
-    sys.path.append("/home/kingb/aim-memory")
+    aim_memory_path = os.environ.get("AIM_MEMORY_PATH", "../aim-memory")
+    sys.path.append(os.path.abspath(aim_memory_path))
     from aim_memory.embeddings import get_embedding as aim_get_embedding
 except ImportError:
     aim_get_embedding = None
