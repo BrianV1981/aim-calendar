@@ -25,12 +25,12 @@
 A.I.M. Calendar (Actual Intelligent Memory Calendar) is an Enterprise Exocortex that unifies chronological phone call transcripts and SMS logs into a searchable, multimodal vector database (LanceDB). It uses a local-first GitOps architecture managed by the **Joshua OS Sovereign Co-Agent**.
 
 ### Your Knowledge Base
-*   **Root Documentation:** `/home/kingb/aim-talkeracr/memory-wiki/index.md`
-*   **Architecture:** `/home/kingb/aim-talkeracr/memory-wiki/pages/architecture.md`
-*   **Obsidian Integration:** `/home/kingb/aim-talkeracr/memory-wiki/pages/obsidian_calendar_integration.md`
-*   **MMS Translation Pipeline:** `/home/kingb/aim-talkeracr/memory-wiki/pages/mms_multimodal_translation.md`
-*   **Tools Registry:** `/home/kingb/aim-talkeracr/TOOLS.md`
-*   **Joshua OS Rules:** `/home/kingb/aim-talkeracr/AGENTS.md` (MUST READ for GitOps workflow `aim fix` / `aim promote`)
+*   **Root Documentation:** `/home/kingb/aim-calendar/memory-wiki/index.md`
+*   **Architecture:** `/home/kingb/aim-calendar/memory-wiki/pages/architecture.md`
+*   **Obsidian Integration:** `/home/kingb/aim-calendar/memory-wiki/pages/obsidian_calendar_integration.md`
+*   **MMS Translation Pipeline:** `/home/kingb/aim-calendar/memory-wiki/pages/mms_multimodal_translation.md`
+*   **Tools Registry:** `/home/kingb/aim-calendar/TOOLS.md`
+*   **Joshua OS Rules:** `/home/kingb/aim-calendar/AGENTS.md` (MUST READ for GitOps workflow `aim fix` / `aim promote`)
 
 ---
 
