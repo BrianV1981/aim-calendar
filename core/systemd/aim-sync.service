@@ -5,10 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/aim-talkeracr
-ExecStart=/bin/bash %h/aim-talkeracr/core/sync_daemon.sh --once
-StandardOutput=append:%h/aim-talkeracr/sync_daemon.log
-StandardError=append:%h/aim-talkeracr/sync_daemon.log
+WorkingDirectory=%h/aim-calendar
+ExecStart=/bin/bash %h/aim-calendar/core/sync_daemon.sh --once
+StandardOutput=append:%h/aim-calendar/sync_daemon.log
+StandardError=append:%h/aim-calendar/sync_daemon.log
 
 [Install]
 WantedBy=default.target

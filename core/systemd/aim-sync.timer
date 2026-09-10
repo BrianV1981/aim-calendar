@@ -1,6 +1,6 @@
 [Unit]
 Description=A.I.M. Calendar Periodic Background Sync Timer
-ConditionPathExists=%h/aim-talkeracr/core/sync_daemon.sh
+ConditionPathExists=%h/aim-calendar/core/sync_daemon.sh
 
 [Timer]
 OnBootSec=2min
