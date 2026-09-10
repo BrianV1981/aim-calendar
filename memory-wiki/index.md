@@ -10,3 +10,4 @@ Welcome to the **A.I.M. Calendar** Knowledge Base. This repository manages the l
 
 ## Data Processing Runbooks
 *   [LanceDB Cartridge Generation](pages/lancedb_cartridge.md) - Explains how the audio transcripts are chunked, embedded, and compacted into the modular memory cartridge without disk bloat.
+*   [Community & Open Source Migration](pages/community_migration.md) - Guidelines on environment variables (`AIM_MEMORY_PATH`) and repository decoupling for external collaborators.
