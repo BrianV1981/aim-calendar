@@ -1,8 +1,8 @@
 # A.I.M. Calendar — Engineering Handoff
 
-> **Updated:** 2026-09-04T02:52:00-04:00
+> **Updated:** 2026-09-10T00:38:00-04:00
 > **Updated by:** Agent (Session ID: 46a36164-e5a0-482b-89e1-9793a7bf2e1d)
-> **Priority Mission:** Ingest Daily Notes into LanceDB (Issue #2) & Obsidian UI Integration (Issue #3)
+> **Priority Mission:** Transition into Feature Expansion (Foundations Complete)
 > **Operator:** Brian / King B
 
 ---
@@ -18,6 +18,7 @@
 | 46a36164 | **Issue #2 (LanceDB Daily Notes Vector Injection):** Implemented `core/ingest_to_lancedb.py` with sliding window temporal chunking, date anchoring (`[Date: YYYY-MM-DD]`), multiline bullet group preservation, idempotent session tracking against `talker_cartridge.lance` table `fragments` (`type: "daily_note"`), 768-dim `nomic-embed-text` embeddings, table optimization, and FTS indexing. Tested with 3 unit tests in `core/test_ingest_to_lancedb.py`. Promoted to `main`. | ✅ RESOLVED |
 | 46a36164 | **Issue #3 (Obsidian Calendar UI & Vault Integration):** Implemented `core/obsidian_vault.py` with turnkey `.obsidian/` vault generation, Liam Cain's official Calendar community plugin preconfigured, and standardized YAML frontmatter across 2,031 Daily Notes with tags (`daily-note`, `calendar`, `timeline`, `exocortex`). Tested with 6 unit tests in `core/test_obsidian_vault.py`. Promoted to `main`. | ✅ RESOLVED |
 | 46a36164 | **Issues #5 & #7 (Memory Wiki Architecture Updates):** Formalized architecture and operational runbooks in `memory-wiki/pages/architecture.md` and `memory-wiki/pages/obsidian_calendar_integration.md`. Promoted to `main`. | ✅ RESOLVED |
+| 46a36164 | **Open Source Migration (Issues #8-#11):** Stripped hardcoded `/home/kingb` paths, replaced with dynamic `AIM_MEMORY_PATH` variables, ignored `joshua_os`, and unified local directory as `aim-calendar`. Wiki fully updated. | ✅ RESOLVED |
 
 ---
 
@@ -34,53 +35,58 @@ A.I.M. Calendar (Actual Intelligent Memory Calendar) is an Enterprise Exocortex 
 
 ---
 
-## 2. CURRENT MISSION STATUS: ALL ISSUES CLOSED (100% PASSING)
-All foundational issues in the milestone are completely implemented, empirically tested, and promoted to `main`:
-*   **Issue #4:** ✅ Closed (Background Sync Daemon)
-*   **Issue #1:** ✅ Closed (Multimodal MMS Translation Pipeline)
-*   **Issue #2:** ✅ Closed (LanceDB Vector Injection - Markdown RAG)
-*   **Issue #3:** ✅ Closed (Obsidian Calendar UI / Vault Integration)
-*   **Issue #5:** ✅ Closed (Wiki Architecture Update)
-*   **Issue #6:** ✅ Closed (Ingestion Gaps Documentation)
-*   **Issue #7:** ✅ Closed (Wiki Update for RAG & Obsidian)
+## 2. YOUR MISSION: TBD (Feature Expansion)
+The Phase 1 Core Architecture is officially complete, fully tested, and open-source ready. The next agent's mission will be determined by the Operator. Potential next phases include the offline visual translation pipeline (`locomo-v2`) or enhanced agentic querying against the generated LanceDB cartridge.
+
+### Execution Queue (in order)
+#### 1️⃣ Wait for Operator Instruction
+**Problem:** Phase 1 is 100% complete and fully merged to `main`. There are zero open issues.
+**Fix:** Prompt the Operator for the Phase 2 roadmap.
+**Key files:** N/A
 
 ---
 
-## 3. HOW TO RUN THE TEST SUITES
-All 23 unit tests across 4 test suites are verified 100% passing on `main`:
-```bash
-python3 -m unittest core/test_sync_daemon.py core/test_ingest_sms.py core/test_ingest_to_lancedb.py core/test_obsidian_vault.py
-```
+## 3. DETAILED ANALYSIS / BREAKDOWN
+All foundational data engineering pipelines (MMS Extraction, LanceDB Vector Injection, Sync Daemon, Obsidian Vault generator) are stable and fully documented in the `memory-wiki`. The environment has been formally decoupled from local `/home/kingb/` configurations to enable seamless community sharing. The `AIM_MEMORY_PATH` environment variable now dynamically dictates the memory dependencies.
 
-## 4. OPERATIONAL RUNBOOK
+---
 
-### Sync & Ingestion
-```bash
-# Check sync status
-core/sync_daemon.sh --status
+## 4. IMPLEMENTATION STRATEGY
+1. **Maintain GitOps Integrity:** Any future changes MUST strictly adhere to the `aim fix <issue>` and `aim promote` GitOps workflow mandated by `AGENTS.md`.
+2. **Wiki-First Development:** Continue expanding `memory-wiki/` before writing complex pipeline code.
 
-# Dry-run sync
-core/sync_daemon.sh --once --dry-run
+---
 
-# Run full sync cycle (auto-runs ingest_sms.py and ingest_to_lancedb.py)
-core/sync_daemon.sh --once
+## 5. THE CRITICAL TRAPS & WARNINGS
+> **⚠️ EPISTEMIC / OPERATIONAL WARNINGS**
+*   **The Sync Daemon Horizon:** LanceDB only knows about data that has been successfully pulled by `core/sync_daemon.sh` and pushed through the ingest pipeline.
+*   **No Direct `main` Commits:** Always spawn a worktree via `aim fix` for pipeline changes to protect the user's data vault.
+*   **Destructive Edits Forbidden:** Do not run `cat >` or global `sed` operations on live configuration files.
 
-# Install 15-minute background systemd timer
-core/sync_daemon.sh --install-systemd
-```
+---
 
-### LanceDB Vector Ingestion
-```bash
-# Ingest recent daily notes (idempotent)
-python3 core/ingest_to_lancedb.py --recent 10
+## 6. KEY PATHS
+*   **Daemon/Cron Entrypoint:** `core/sync_daemon.sh`
+*   **XML Ingestion (SMS/MMS):** `core/ingest_sms.py`
+*   **Vectorization (LanceDB):** `core/ingest_to_lancedb.py`
+*   **Test Suites:** `core/test_*.py`
+*   **Data Vault:** `conversations/` (Raw XML, media, daily notes)
+*   **Cartridge Output:** `talker_cartridge.lance`
 
-# Dry-run injection
-python3 core/ingest_to_lancedb.py --dry-run --recent 5
-```
+---
 
-### Obsidian Vault & Calendar UI
-```bash
-# Initialize vault and migrate frontmatter tags across all Daily Notes
-python3 core/obsidian_vault.py --migrate-tags
-```
+## 7. THE FULL PICTURE / WHAT COMES AFTER
+With the data correctly chunked, diarized, and mapped to Obsidian Markdown Daily Notes, the ecosystem is primed for **Agentic Orchestration**. Future modules can query `talker_cartridge.lance` directly to generate strategic tactical dossiers, personal summaries, or perform offline image recognition on extracted MMS media via `locomo-v2`.
 
+---
+
+## 8. OPERATOR PREFERENCES
+*   **Zero-UI Agentic Execution:** No interactive CLI modals or guessing stdin.
+*   **GitOps Phase Protocol:** Explicit consent required to promote branches to `main`.
+*   **Destructive Constraints:** "The Blast Radius Mandate" forbids untracked global edits.
+
+---
+
+## 9. IMMEDIATE NEXT STEPS
+1. Wait for the Operator to define the next feature objective (e.g., Phase 2).
+2. If given a new feature, read `AGENTS.md`, ensure GitHub issues are properly tracked, and execute the GitOps loop.
