@@ -58,3 +58,38 @@ The backend engine resides in `/core/` and executes the pipeline iteratively:
 A.I.M. Calendar operates strictly on your local hardware. None of your private SMS messages, phone recordings, or images are ever sent to a cloud API.
 
 *Built for the Joshua OS Ecosystem.*
+
+## 💻 Installation & Quickstart
+
+### Prerequisites
+1. **Python 3.10+**
+2. **rclone** (Installed and authenticated via `rclone config` as a remote named `gdrive:`)
+3. **Ollama** (Running locally with the `nomic-embed-text` model installed)
+
+### Setup
+```bash
+# 1. Clone the repository
+git clone https://github.com/BrianV1981/aim-calendar.git
+cd aim-calendar
+
+# 2. Install Python dependencies
+pip install -r requirements.txt
+
+# 3. Environment Variables (Optional)
+# If using the broader aim-memory architecture, define its path:
+export AIM_MEMORY_PATH="/path/to/aim-memory"
+```
+
+### Running the System
+The system is designed to run automatically in the background using `systemd`.
+
+```bash
+# Install and start the background sync daemon (runs every 15 minutes)
+./core/sync_daemon.sh --install-systemd
+
+# Or run a single manual synchronization cycle immediately:
+./core/sync_daemon.sh --once
+
+# Check the status of the daemon
+./core/sync_daemon.sh --status
+```
