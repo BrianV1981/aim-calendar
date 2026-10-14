@@ -9,7 +9,8 @@ from core.ingest_sms import (
     sort_daily_notes,
     extract_mms_parts,
     ingest_xml_directory,
-    ingest_diarized_transcripts
+    ingest_diarized_transcripts,
+    prune_superseded_backups
 )
 
 # 1x1 transparent GIF base64 string
@@ -312,6 +313,58 @@ model: large-v3 + pyannote
         self.assertIn("+15550100100", content)
         self.assertIn("[SPEAKER_00]", content)
         self.assertIn("Full Transcript", content)
+
+    def test_prune_superseded_backups(self):
+        """Test pruning of superseded cumulative XMLs and extracted ZIP archives (CAL-012)."""
+        raw_dir = os.path.join(self.test_dir, "sms_raw_prune")
+        os.makedirs(raw_dir, exist_ok=True)
+        manifest_path = os.path.join(raw_dir, ".processed_xml_manifest.json")
+
+        calls_xml = """<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<calls count="1">
+  <call number="5550101234" duration="30" type="1" date="1672574400000" contact_name="Alice" />
+</calls>"""
+        sms_xml = """<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<smses count="1">
+  <sms protocol="0" address="5550105678" date="1672578000000" type="1" body="Prune test!" contact_name="Bob" />
+</smses>"""
+
+        for name in ("calls-20261001000000.xml", "calls-20261002000000.xml", "calls.xml"):
+            with open(os.path.join(raw_dir, name), "w", encoding="utf-8") as f:
+                f.write(calls_xml)
+
+        for name in ("sms-20261001000000.xml", "sms-20261002000000.xml", "messages.xml"):
+            with open(os.path.join(raw_dir, name), "w", encoding="utf-8") as f:
+                f.write(sms_xml)
+
+        zip_path = os.path.join(raw_dir, "sms_backup_100.zip")
+        marker_path = zip_path + ".extracted"
+        with open(zip_path, "wb") as f:
+            f.write(b"PK\x03\x04dummyzip")
+        with open(marker_path, "w", encoding="utf-8") as f:
+            f.write("")
+
+        ingest_xml_directory(
+            input_dir=raw_dir,
+            output_dir=self.notes_dir,
+            media_dir=self.media_dir,
+            manifest_path=manifest_path,
+            prune=True,
+            keep_latest=1
+        )
+
+        # Older cumulative XMLs, unpacked calls.xml/messages.xml, and extracted .zip should be pruned
+        self.assertFalse(os.path.exists(os.path.join(raw_dir, "calls-20261001000000.xml")))
+        self.assertFalse(os.path.exists(os.path.join(raw_dir, "sms-20261001000000.xml")))
+        self.assertFalse(os.path.exists(os.path.join(raw_dir, "calls.xml")))
+        self.assertFalse(os.path.exists(os.path.join(raw_dir, "messages.xml")))
+        self.assertFalse(os.path.exists(zip_path))
+
+        # Newest cumulative XMLs, .zip.extracted marker, and manifest must be preserved
+        self.assertTrue(os.path.exists(os.path.join(raw_dir, "calls-20261002000000.xml")))
+        self.assertTrue(os.path.exists(os.path.join(raw_dir, "sms-20261002000000.xml")))
+        self.assertTrue(os.path.exists(marker_path))
+        self.assertTrue(os.path.exists(manifest_path))
 
 
 if __name__ == '__main__':

@@ -205,6 +205,72 @@ class TestSyncDaemon(unittest.TestCase):
         extracted_file = os.path.join(self.mock_sms_local, "extracted_test.xml")
         self.assertTrue(os.path.exists(extracted_file), "Zip archive was not unpacked in SMS folder.")
 
+    def test_manifest_exclude_prevents_redownload(self):
+        """Files listed in .processed_xml_manifest.json or .zip.extracted are not re-downloaded (CAL-012)."""
+        import json
+        # Remote has an already-processed XML, an already-extracted zip, and one brand-new XML
+        with open(os.path.join(self.mock_sms_remote, "sms-20260903012405.xml"), "w") as f:
+            f.write("<smses>old</smses>")
+        with open(os.path.join(self.mock_sms_remote, "sms_backup_old.zip"), "w") as f:
+            f.write("oldzip")
+        with open(os.path.join(self.mock_sms_remote, "sms-20261014000000.xml"), "w") as f:
+            f.write("<smses>new</smses>")
+
+        # Local has the manifest and .zip.extracted marker, but the old XML and zip have been pruned
+        manifest_path = os.path.join(self.mock_sms_local, ".processed_xml_manifest.json")
+        with open(manifest_path, "w") as f:
+            json.dump({"xml_files": {"sms-20260903012405.xml": {"size": 18, "mtime": 100}}}, f)
+        with open(os.path.join(self.mock_sms_local, "sms_backup_old.zip.extracted"), "w") as f:
+            f.write("")
+
+        env = os.environ.copy()
+        env["GDRIVE_SMS_PATH"] = self.mock_sms_remote
+        env["GDRIVE_AUDIO_PATH"] = self.mock_audio_remote
+        env["LOCAL_SMS_DIR"] = self.mock_sms_local
+        env["LOCAL_AUDIO_DIR"] = self.mock_audio_local
+        env["LOG_FILE"] = self.mock_log
+        env["LOCK_FILE"] = self.mock_lock
+        env["USE_LOCAL_MOCK"] = "1"
+
+        result = subprocess.run(
+            ["bash", SYNC_SCRIPT, "--once", "--no-pipeline"],
+            capture_output=True,
+            text=True,
+            env=env
+        )
+        self.assertEqual(result.returncode, 0, f"Sync script failed: {result.stderr}")
+        self.assertFalse(os.path.exists(os.path.join(self.mock_sms_local, "sms-20260903012405.xml")))
+        self.assertFalse(os.path.exists(os.path.join(self.mock_sms_local, "sms_backup_old.zip")))
+        self.assertTrue(os.path.exists(os.path.join(self.mock_sms_local, "sms-20261014000000.xml")))
+
+    def test_single_line_logging_when_stderr_redirected(self):
+        """Redirecting stdout/stderr to LOG_FILE does not duplicate log lines (CAL-013)."""
+        env = os.environ.copy()
+        env["GDRIVE_SMS_PATH"] = self.mock_sms_remote
+        env["GDRIVE_AUDIO_PATH"] = self.mock_audio_remote
+        env["LOCAL_SMS_DIR"] = self.mock_sms_local
+        env["LOCAL_AUDIO_DIR"] = self.mock_audio_local
+        env["LOG_FILE"] = self.mock_log
+        env["LOCK_FILE"] = self.mock_lock
+        env["USE_LOCAL_MOCK"] = "1"
+
+        with open(self.mock_log, "a") as log_f:
+            result = subprocess.run(
+                ["bash", SYNC_SCRIPT, "--once", "--no-pipeline"],
+                stdout=log_f,
+                stderr=log_f,
+                text=True,
+                env=env
+            )
+        self.assertEqual(result.returncode, 0)
+        with open(self.mock_log, "r") as f:
+            log_content = f.read()
+        self.assertEqual(
+            log_content.count("A.I.M. Background Sync Cycle Started"),
+            1,
+            f"Expected exactly 1 occurrence of cycle start banner, got:\n{log_content}"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

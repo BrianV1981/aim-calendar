@@ -7,12 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [1.1.0] - 2026-10-14
 ### Added
 - **Incremental XML Globbing & Manifest Ledger (`CAL-002`):** Upgraded `core/ingest_sms.py` with full CLI `argparse` flags (`--input-dir`, `--file`, `--force`, `--dry-run`, `--manifest`) and `.processed_xml_manifest.json` tracking so newly synced `calls-*.xml` and `sms-*.xml` files are ingested incrementally without re-parsing historical 11GB backups.
+- **Automated Superseded Backup Pruning & Exclude Filter (`CAL-012`):** Added `prune_superseded_backups` to `core/ingest_sms.py` to automatically delete superseded cumulative `sms-*.xml`, `calls-*.xml`, unpacked `calls.xml`/`messages.xml`, and extracted `.zip` archives once recorded in `.processed_xml_manifest.json`, and updated `core/sync_daemon.sh` to pass `--exclude-from` generated from the manifest and `.zip.extracted` markers so pruned backups are never re-downloaded (~192GB disk reclaimed).
 - **Audio Transcript Interleaving in Daily Notes (`CAL-005`):** Added `ingest_diarized_transcripts` to `core/ingest_sms.py` to chronologically link and interleave speaker-diarized call transcripts (`conversations_diarized/*.md`) directly into `conversations/daily_notes/YYYY-MM-DD.md`.
 - **Full Audio Pipeline Chaining (`CAL-004`):** Wired `batch_ingest.py` -> `classify_calls.py` -> `batch_diarize.py` -> `build_cartridge.py` -> `ingest_sms.py` -> `ingest_to_lancedb.py` into `core/sync_daemon.sh` (`--run-diarize`).
 - **MIT License & Dependency Manifest (`CAL-010`):** Added root `LICENSE` file and completed `requirements.txt`.
 
 ### Changed
-- **Security & Secret Remediation (`CAL-001`):** Removed all hardcoded API keys (`OPENAI_API_KEY`, `HF_TOKEN`) and sanitized personal phone numbers/PII across scripts, tests, and documentation.
+- **Security & Git History Remediation (`CAL-001`):** Removed all hardcoded API keys (`OPENAI_API_KEY`, `HF_TOKEN`), scrubbed historical git commits across all refs, replaced the hardcoded personal Google Drive SMS path default with `gdrive:SMS_Backups` (moving host-specific overrides to untracked `.env`), and sanitized personal phone numbers/PII across scripts, tests, and documentation.
+- **Systemd Single-Line Logging (`CAL-013`):** Updated `core/systemd/aim-sync.service` and `core/sync_daemon.sh` (`install_systemd` + inode deduplication in `log()`) so `sync_daemon.log` never records duplicate lines when triggered by systemd or cron.
 - **Local-First Call Classification (`CAL-007`):** Switched `core/classify_calls.py` to use local Ollama (`qwen3.5:4b`) by default, preserving 100% local/air-gapped operation.
 - **Git & Test Suite Hygiene (`CAL-003`, `CAL-006`, `CAL-009`, `CAL-011`):** Untracked `joshua_os/` from git index, guarded top-level execution in `core/test_fts.py` and `core/test_retrieval.py`, fixed `core/obsidian_vault.py --dry-run` side effects, and removed root clutter.
 

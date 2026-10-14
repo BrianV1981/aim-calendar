@@ -14,6 +14,18 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # ------------------------------------------------------------------------------
 # 1. Environment & Default Configuration
 # ------------------------------------------------------------------------------
+# Load optional local .env overrides (untracked)
+if [ -f "${REPO_ROOT}/.env" ]; then
+    # shellcheck disable=SC1091
+    source "${REPO_ROOT}/.env"
+else
+    GIT_COMMON_ENV="$(git -C "$REPO_ROOT" rev-parse --git-common-dir 2>/dev/null || true)"
+    if [ -n "$GIT_COMMON_ENV" ] && [ -f "$(dirname "$GIT_COMMON_ENV")/.env" ]; then
+        # shellcheck disable=SC1090
+        source "$(dirname "$GIT_COMMON_ENV")/.env"
+    fi
+fi
+
 GDRIVE_REMOTE="${GDRIVE_REMOTE:-gdrive:}"
 GDRIVE_AUDIO_PATH="${GDRIVE_AUDIO_PATH:-${GDRIVE_REMOTE}TalkerACR/All}"
 GDRIVE_SMS_PATH="${GDRIVE_SMS_PATH:-${GDRIVE_REMOTE}SMS_Backups}"
@@ -58,7 +70,10 @@ log() {
     local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $*"
     echo "$msg" >&2
     mkdir -p "$(dirname "$LOG_FILE")"
-    echo "$msg" >> "$LOG_FILE"
+    # Prevent duplicate lines when stderr is already redirected to LOG_FILE (e.g. cron/systemd)
+    if [ ! -e "$LOG_FILE" ] || [ ! /dev/stderr -ef "$LOG_FILE" ]; then
+        echo "$msg" >> "$LOG_FILE"
+    fi
 }
 
 acquire_lock() {
@@ -87,10 +102,40 @@ cleanup() {
 count_files() {
     local dir="$1"
     if [ -d "$dir" ]; then
-        find "$dir" -maxdepth 1 -type f | wc -l
+        find "$dir" -maxdepth 1 -type f -not -name ".*" -not -name "*.extracted" | wc -l
     else
         echo 0
     fi
+}
+
+build_rclone_exclude() {
+    local local_dest="$1"
+    local exclude_file="$local_dest/.rclone_exclude.txt"
+    local manifest_file="$local_dest/.processed_xml_manifest.json"
+    : > "$exclude_file"
+
+    if [ -f "$manifest_file" ]; then
+        "$PYTHON_BIN" -c '
+import json, sys
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as f:
+        data = json.load(f)
+    for k in sorted(data.get("xml_files", {}).keys()):
+        print(k)
+except Exception:
+    pass
+' "$manifest_file" >> "$exclude_file" 2>/dev/null || true
+    fi
+
+    for marker in "$local_dest"/*.zip.extracted; do
+        if [ -f "$marker" ]; then
+            local zip_base
+            zip_base="$(basename "${marker%.extracted}")"
+            echo "$zip_base" >> "$exclude_file"
+        fi
+    done
+
+    echo "$exclude_file"
 }
 
 sync_source() {
@@ -99,6 +144,9 @@ sync_source() {
     local label="$3"
 
     mkdir -p "$local_dest"
+    local exclude_file
+    exclude_file="$(build_rclone_exclude "$local_dest")"
+
     local count_before
     count_before="$(count_files "$local_dest")"
 
@@ -113,10 +161,21 @@ sync_source() {
             return 0
         fi
         if [ -d "$remote" ]; then
-            cp -n "$remote"/* "$local_dest"/ 2>/dev/null || true
+            for src_file in "$remote"/*; do
+                if [ -f "$src_file" ]; then
+                    local base_f
+                    base_f="$(basename "$src_file")"
+                    if ! grep -Fxq "$base_f" "$exclude_file" 2>/dev/null; then
+                        cp -n "$src_file" "$local_dest"/ 2>/dev/null || true
+                    fi
+                fi
+            done
         fi
     else
         local rclone_args=("--update" "--transfers=4")
+        if [ -s "$exclude_file" ]; then
+            rclone_args+=("--exclude-from" "$exclude_file")
+        fi
         if [ "$DRY_RUN" = "1" ]; then
             rclone_args+=("--dry-run")
         fi
@@ -290,8 +349,8 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=$target_root
 ExecStart=/bin/bash $target_root/core/sync_daemon.sh --once
-StandardOutput=append:$target_root/sync_daemon.log
-StandardError=append:$target_root/sync_daemon.log
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=default.target

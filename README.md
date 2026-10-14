@@ -34,7 +34,7 @@ To enable the zero-touch pipeline, configure your Android device to backup to Go
 ### 2. SMS & Call Logs (SMS Backup & Restore)
 1. Install **SMS Backup & Restore** on your Android device.
 2. Go to **Settings -> Advanced Options** and turn ON **Archive (Zip) Backup**. *(Critical: This shrinks the 11GB backup file to under 1GB).*
-3. Set up a **Daily Schedule** (e.g., 3:00 AM) to upload to **Google Drive** (`gdrive:SMS_Backups`).
+3. Set up a **Daily Schedule** (e.g., 3:00 AM) to upload to **Google Drive** (`gdrive:SMS_Backups`, or configure `GDRIVE_SMS_PATH` in `.env`).
 4. Set **"Delete older backups"** to retain only the last 2-3 backups to prevent Google Drive bloat.
 5. (Optional but recommended): Turn on **Incremental Backup** in Backup Settings to only upload new messages.
 

@@ -7,8 +7,8 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=%h/aim-calendar
 ExecStart=/bin/bash %h/aim-calendar/core/sync_daemon.sh --once
-StandardOutput=append:%h/aim-calendar/sync_daemon.log
-StandardError=append:%h/aim-calendar/sync_daemon.log
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=default.target

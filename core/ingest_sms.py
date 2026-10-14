@@ -310,6 +310,83 @@ def save_manifest(manifest_path, manifest_data):
         json.dump(manifest_data, f, indent=2, sort_keys=True)
 
 
+def prune_superseded_backups(
+    input_dir="conversations/sms_raw",
+    manifest_path=None,
+    keep_latest=1,
+    dry_run=False
+):
+    """
+    Prunes superseded cumulative SMS/Call XML backups (`sms-*.xml`, `calls-*.xml`),
+    already-ingested unpacked archive XMLs (`calls.xml`, `messages.xml`), and
+    already-extracted `.zip` archives (preserving `.zip.extracted` markers and
+    `.processed_xml_manifest.json` so rclone/sync_daemon never re-downloads them).
+    """
+    if not os.path.exists(input_dir):
+        return {"pruned_files": 0, "bytes_freed": 0}
+
+    if manifest_path is None:
+        manifest_path = os.path.join(input_dir, ".processed_xml_manifest.json")
+
+    manifest = load_manifest(manifest_path)
+    recorded_xmls = manifest.get("xml_files", {})
+
+    pruned_files = 0
+    bytes_freed = 0
+
+    for pattern in ("calls-*.xml", "sms-*.xml"):
+        matched = sorted(glob.glob(os.path.join(input_dir, pattern)))
+        superseded = matched[:-keep_latest] if keep_latest > 0 else matched
+        for fpath in superseded:
+            fname = os.path.basename(fpath)
+            if fname not in recorded_xmls:
+                continue
+            try:
+                sz = os.path.getsize(fpath)
+                if dry_run:
+                    print(f"[DRY-RUN] Would prune superseded XML: {fname} ({sz} bytes)")
+                else:
+                    os.remove(fpath)
+                    print(f"Pruned superseded XML: {fname} ({sz / (1024**3):.2f} GB)")
+                pruned_files += 1
+                bytes_freed += sz
+            except OSError:
+                pass
+
+    for unpacked_name in ("calls.xml", "messages.xml"):
+        upath = os.path.join(input_dir, unpacked_name)
+        if os.path.exists(upath) and unpacked_name in recorded_xmls:
+            try:
+                sz = os.path.getsize(upath)
+                if dry_run:
+                    print(f"[DRY-RUN] Would prune unpacked XML: {unpacked_name} ({sz} bytes)")
+                else:
+                    os.remove(upath)
+                    print(f"Pruned unpacked XML: {unpacked_name} ({sz / (1024**2):.2f} MB)")
+                pruned_files += 1
+                bytes_freed += sz
+            except OSError:
+                pass
+
+    for zpath in sorted(glob.glob(os.path.join(input_dir, "*.zip"))):
+        marker = zpath + ".extracted"
+        if os.path.exists(marker):
+            zname = os.path.basename(zpath)
+            try:
+                sz = os.path.getsize(zpath)
+                if dry_run:
+                    print(f"[DRY-RUN] Would prune extracted archive: {zname} ({sz} bytes)")
+                else:
+                    os.remove(zpath)
+                    print(f"Pruned extracted archive: {zname} ({sz / (1024**2):.2f} MB)")
+                pruned_files += 1
+                bytes_freed += sz
+            except OSError:
+                pass
+
+    return {"pruned_files": pruned_files, "bytes_freed": bytes_freed}
+
+
 def ingest_xml_directory(
     input_dir="conversations/sms_raw",
     output_dir="conversations/daily_notes",
@@ -317,11 +394,14 @@ def ingest_xml_directory(
     manifest_path=None,
     force=False,
     dry_run=False,
-    batch_size=50000
+    batch_size=50000,
+    prune=True,
+    keep_latest=1
 ):
     """
     Globs all calls-*.xml and sms-*.xml files in input_dir chronologically
     and parses only newly added or modified XML backups using a manifest ledger.
+    Automatically prunes superseded raw backups after recording them in the manifest.
     """
     if not os.path.exists(input_dir):
         print(f"Input directory {input_dir} does not exist. Skipping XML directory ingestion.")
@@ -335,7 +415,12 @@ def ingest_xml_directory(
 
     call_xmls = sorted(glob.glob(os.path.join(input_dir, "calls-*.xml")))
     sms_xmls = sorted(glob.glob(os.path.join(input_dir, "sms-*.xml")))
-    all_xmls = call_xmls + sms_xmls
+    unpacked_xmls = [
+        os.path.join(input_dir, name)
+        for name in ("calls.xml", "messages.xml")
+        if os.path.exists(os.path.join(input_dir, name))
+    ]
+    all_xmls = call_xmls + sms_xmls + unpacked_xmls
 
     # Bootstrap legacy baseline: if manifest didn't exist yet but 2026-09-02.md is already built,
     # mark the legacy 20260903012405 baseline XMLs as processed so we don't re-parse 11GB redundantly.
@@ -350,6 +435,26 @@ def ingest_xml_directory(
                 }
         if not dry_run and manifest["xml_files"]:
             save_manifest(manifest_path, manifest)
+
+    # Mark unpacked calls.xml / messages.xml as already superseded if a newer cumulative XML is already ingested
+    latest_ingested_mtime = max(
+        (v.get("mtime", 0) for k, v in manifest["xml_files"].items() if k.startswith(("sms-", "calls-"))),
+        default=0
+    )
+    for upath in unpacked_xmls:
+        uname = os.path.basename(upath)
+        if not force and uname not in manifest["xml_files"]:
+            try:
+                st = os.stat(upath)
+                if latest_ingested_mtime >= int(st.st_mtime):
+                    manifest["xml_files"][uname] = {
+                        "size": st.st_size,
+                        "mtime": int(st.st_mtime)
+                    }
+                    if not dry_run:
+                        save_manifest(manifest_path, manifest)
+            except OSError:
+                pass
 
     files_parsed = 0
     for xml_path in all_xmls:
@@ -376,6 +481,14 @@ def ingest_xml_directory(
         }
         save_manifest(manifest_path, manifest)
         files_parsed += 1
+
+    if prune:
+        prune_superseded_backups(
+            input_dir=input_dir,
+            manifest_path=manifest_path,
+            keep_latest=keep_latest,
+            dry_run=dry_run
+        )
 
     return files_parsed
 
@@ -586,6 +699,8 @@ def main():
     parser.add_argument("--no-transcripts", action="store_true", help="Skip interleaving diarized audio transcripts into Daily Notes.")
     parser.add_argument("--manifest", default=None, help="Path to incremental XML manifest JSON file.")
     parser.add_argument("--force", action="store_true", help="Force re-parsing of all XML and transcript files regardless of manifest state.")
+    parser.add_argument("--no-prune", action="store_true", help="Do not prune superseded XML backups and extracted ZIP archives after ingestion.")
+    parser.add_argument("--keep-latest", type=int, default=1, help="Number of newest calls-*.xml and sms-*.xml files to retain when pruning (default: 1).")
     parser.add_argument("--dry-run", action="store_true", help="Simulate ingestion without writing files.")
     args = parser.parse_args()
 
@@ -601,7 +716,9 @@ def main():
             media_dir=args.media_dir,
             manifest_path=args.manifest,
             force=args.force,
-            dry_run=args.dry_run
+            dry_run=args.dry_run,
+            prune=not args.no_prune,
+            keep_latest=args.keep_latest
         )
         if xml_count > 0:
             changed = True
