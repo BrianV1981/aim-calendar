@@ -12,7 +12,7 @@ OUTPUT_DIR = "conversations_diarized"
 ORIGINAL_MD_DIR = "conversations"
 ERROR_LOG = "diarize_errors.log"
 MODEL_SIZE = "large-v3"
-HF_TOKEN = "REDACTED_HF_TOKEN"
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 def setup_directories():
     if not os.path.exists(OUTPUT_DIR):
@@ -46,6 +46,8 @@ def log_error(filename, error_msg):
         f.write(f"[{filename}] ERROR: {error_msg}\n")
 
 def process_all_files():
+    if not HF_TOKEN:
+        raise RuntimeError("HF_TOKEN environment variable is required for Pyannote diarization.")
     setup_directories()
     
     print(f"Loading {MODEL_SIZE} Whisper model...")

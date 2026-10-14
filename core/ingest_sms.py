@@ -135,7 +135,7 @@ def extract_mms_parts(elem, timestamp_ms, media_dir, output_dir, md5_cache):
     return text_body, media_links
 
 
-def parse_large_xml(xml_path, output_dir="conversations/daily_notes", media_dir="conversations/media", batch_size=50000):
+def parse_large_xml(xml_path, output_dir="conversations/daily_notes", media_dir="conversations/media", batch_size=50000, dry_run=False):
     """
     Parses massive XML files (10GB+) using iterparse to avoid OOM crashes.
     Extracts Calls, SMS, and MMS (including Base64 media payloads).
@@ -143,7 +143,11 @@ def parse_large_xml(xml_path, output_dir="conversations/daily_notes", media_dir=
     """
     if not os.path.exists(xml_path):
         print(f"File {xml_path} does not exist. Skipping.")
-        return
+        return 0
+
+    if dry_run:
+        print(f"[DRY-RUN] Would parse XML file: {xml_path}")
+        return 0
 
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(media_dir, exist_ok=True)
@@ -277,11 +281,238 @@ def parse_large_xml(xml_path, output_dir="conversations/daily_notes", media_dir=
         print(f"  ...processed {total_processed} total records.")
 
     print(f"Finished parsing {xml_path}!")
+    return total_processed
+
+
+def load_manifest(manifest_path):
+    """Loads the incremental ingestion manifest from disk."""
+    import json
+    if manifest_path and os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    data.setdefault("xml_files", {})
+                    data.setdefault("transcripts", {})
+                    return data
+        except Exception:
+            pass
+    return {"xml_files": {}, "transcripts": {}}
+
+
+def save_manifest(manifest_path, manifest_data):
+    """Persists the incremental ingestion manifest to disk."""
+    import json
+    if not manifest_path:
+        return
+    os.makedirs(os.path.dirname(os.path.abspath(manifest_path)), exist_ok=True)
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_data, f, indent=2, sort_keys=True)
+
+
+def ingest_xml_directory(
+    input_dir="conversations/sms_raw",
+    output_dir="conversations/daily_notes",
+    media_dir="conversations/media",
+    manifest_path=None,
+    force=False,
+    dry_run=False,
+    batch_size=50000
+):
+    """
+    Globs all calls-*.xml and sms-*.xml files in input_dir chronologically
+    and parses only newly added or modified XML backups using a manifest ledger.
+    """
+    if not os.path.exists(input_dir):
+        print(f"Input directory {input_dir} does not exist. Skipping XML directory ingestion.")
+        return 0
+
+    if manifest_path is None:
+        manifest_path = os.path.join(input_dir, ".processed_xml_manifest.json")
+
+    manifest_existed = os.path.exists(manifest_path)
+    manifest = load_manifest(manifest_path)
+
+    call_xmls = sorted(glob.glob(os.path.join(input_dir, "calls-*.xml")))
+    sms_xmls = sorted(glob.glob(os.path.join(input_dir, "sms-*.xml")))
+    all_xmls = call_xmls + sms_xmls
+
+    # Bootstrap legacy baseline: if manifest didn't exist yet but 2026-09-02.md is already built,
+    # mark the legacy 20260903012405 baseline XMLs as processed so we don't re-parse 11GB redundantly.
+    if not manifest_existed and not force and os.path.exists(os.path.join(output_dir, "2026-09-02.md")):
+        for legacy_name in ("calls-20260903012405.xml", "sms-20260903012405.xml"):
+            legacy_path = os.path.join(input_dir, legacy_name)
+            if os.path.exists(legacy_path):
+                st = os.stat(legacy_path)
+                manifest["xml_files"][legacy_name] = {
+                    "size": st.st_size,
+                    "mtime": int(st.st_mtime)
+                }
+        if not dry_run and manifest["xml_files"]:
+            save_manifest(manifest_path, manifest)
+
+    files_parsed = 0
+    for xml_path in all_xmls:
+        fname = os.path.basename(xml_path)
+        try:
+            st = os.stat(xml_path)
+        except OSError:
+            continue
+
+        recorded = manifest["xml_files"].get(fname)
+        if not force and recorded and recorded.get("size") == st.st_size:
+            print(f"Skipping already ingested XML: {fname}")
+            continue
+
+        if dry_run:
+            print(f"[DRY-RUN] Would parse XML backup: {fname} ({st.st_size} bytes)")
+            files_parsed += 1
+            continue
+
+        parse_large_xml(xml_path, output_dir=output_dir, media_dir=media_dir, batch_size=batch_size, dry_run=False)
+        manifest["xml_files"][fname] = {
+            "size": st.st_size,
+            "mtime": int(st.st_mtime)
+        }
+        save_manifest(manifest_path, manifest)
+        files_parsed += 1
+
+    return files_parsed
+
+
+def ingest_diarized_transcripts(
+    transcripts_dir="conversations_diarized",
+    output_dir="conversations/daily_notes",
+    manifest_path=None,
+    force=False,
+    dry_run=False,
+    max_preview_lines=4
+):
+    """
+    Chronologically links and interleaves diarized call transcripts from
+    `conversations_diarized/*.md` into `conversations/daily_notes/YYYY-MM-DD.md`.
+    """
+    import re
+    if not os.path.exists(transcripts_dir):
+        return 0
+
+    if manifest_path is None:
+        manifest_path = os.path.join(output_dir, ".processed_transcripts_manifest.json")
+
+    manifest = load_manifest(manifest_path)
+    recorded_transcripts = manifest.get("transcripts", {})
+
+    md_files = sorted(glob.glob(os.path.join(transcripts_dir, "*.md")))
+    if not md_files:
+        return 0
+
+    os.makedirs(output_dir, exist_ok=True)
+    buffer = defaultdict(list)
+    linked_count = 0
+
+    for t_path in md_files:
+        fname = os.path.basename(t_path)
+        if not force and fname in recorded_transcripts:
+            continue
+
+        try:
+            with open(t_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception:
+            continue
+
+        # Extract frontmatter fields
+        date_raw = None
+        contact_raw = None
+        duration_raw = "unknown"
+        platform_raw = "phone"
+
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                fm_text = parts[1]
+                for line in fm_text.splitlines():
+                    if ":" in line:
+                        k, v = line.split(":", 1)
+                        k = k.strip()
+                        v = v.strip().strip('"').strip("'")
+                        if k == "date":
+                            date_raw = v
+                        elif k == "contact":
+                            contact_raw = v
+                        elif k == "duration":
+                            duration_raw = v
+                        elif k == "platform":
+                            platform_raw = v
+
+        # Fallback to filename pattern: <platform>_<YYYYMMDD-HHMMSS>_<contact>.md
+        base_no_ext = os.path.splitext(fname)[0]
+        m = re.match(r"^([a-zA-Z0-9]+)_(\d{8}-\d{6})(?:_(.*))?$", base_no_ext)
+        if m:
+            if not platform_raw or platform_raw == "unknown":
+                platform_raw = m.group(1)
+            if not date_raw or date_raw == "unknown":
+                date_raw = m.group(2)
+            if not contact_raw or contact_raw in ("unknown", ""):
+                contact_raw = (m.group(3) or "Unknown").lstrip("_")
+
+        if not date_raw:
+            continue
+
+        try:
+            dt_obj = datetime.strptime(date_raw, "%Y%m%d-%H%M%S")
+            day_key = dt_obj.strftime("%Y-%m-%d")
+            time_str = dt_obj.strftime("%I:%M %p")
+            timestamp_ms = int(dt_obj.timestamp() * 1000)
+        except Exception:
+            continue
+
+        contact_display = contact_raw if contact_raw and contact_raw != "unknown" else "Unknown"
+
+        # Extract speaker dialogue preview lines
+        transcript_body = content.split("# Transcript", 1)[-1].strip() if "# Transcript" in content else ""
+        preview_lines = []
+        if transcript_body:
+            for line in transcript_body.splitlines():
+                line_s = line.strip()
+                if line_s.startswith("[SPEAKER_") or line_s.startswith("[Unknown]"):
+                    preview_lines.append(f"  > {line_s}")
+                    if len(preview_lines) >= max_preview_lines:
+                        break
+
+        rel_path = os.path.relpath(t_path, output_dir)
+        header = (
+            f"**[{time_str}] Audio Call Transcript** ({contact_display}) "
+            f"(Duration: {duration_raw}) — [Full Transcript]({rel_path})"
+        )
+        entry_lines = [header] + preview_lines
+        full_content = "\n".join(entry_lines)
+
+        if not dry_run:
+            buffer[day_key].append({
+                "timestamp_ms": timestamp_ms,
+                "content": full_content
+            })
+            recorded_transcripts[fname] = day_key
+
+        linked_count += 1
+
+    if dry_run:
+        print(f"[DRY-RUN] Would interleave {linked_count} audio transcripts into Daily Notes.")
+        return linked_count
+
+    if buffer:
+        append_to_daily_files(buffer, output_dir)
+        manifest["transcripts"] = recorded_transcripts
+        save_manifest(manifest_path, manifest)
+        print(f"Interleaved {linked_count} audio transcripts across {len(buffer)} Daily Notes.")
+
+    return linked_count
 
 
 def sort_daily_notes(output_dir="conversations/daily_notes"):
     """
-    Since we append files in batches (and mix SMS, Calls, and MMS),
+    Since we append files in batches (and mix SMS, Calls, MMS, and Audio Transcripts),
     we perform a final pass to ensure all log blocks within a day are strictly chronological
     while preserving multi-line attachments and markdown images.
     """
@@ -313,6 +544,16 @@ def sort_daily_notes(output_dir="conversations/daily_notes"):
         if current_entry:
             entries.append("".join(current_entry))
 
+        # Deduplicate identical entries while preserving order
+        seen = set()
+        unique_entries = []
+        for entry in entries:
+            norm = entry.strip()
+            if norm not in seen:
+                seen.add(norm)
+                unique_entries.append(entry)
+        entries = unique_entries
+
         # Sort entries based on the time string in the brackets (e.g. [02:02 PM])
         def get_time(entry):
             try:
@@ -326,17 +567,60 @@ def sort_daily_notes(output_dir="conversations/daily_notes"):
         with open(file, "w", encoding="utf-8") as f:
             for h in header:
                 f.write(h)
-            f.write("\n")
+            if header and not header[-1].endswith("\n\n"):
+                f.write("\n")
             for entry in entries:
                 f.write(entry)
                 if not entry.endswith("\n"):
                     f.write("\n")
 
 
-if __name__ == '__main__':
-    # Parse the real production files
-    parse_large_xml("conversations/sms_raw/calls-20260903012405.xml")
-    parse_large_xml("conversations/sms_raw/sms-20260903012405.xml")
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Ingest Android SMS/MMS/Call XML backups and audio transcripts into chronological Daily Notes.")
+    parser.add_argument("--input-dir", default="conversations/sms_raw", help="Directory containing calls-*.xml and sms-*.xml files.")
+    parser.add_argument("--file", default=None, help="Parse a single specific XML file instead of globbing --input-dir.")
+    parser.add_argument("--output-dir", default="conversations/daily_notes", help="Directory for output YYYY-MM-DD.md Daily Notes.")
+    parser.add_argument("--media-dir", default="conversations/media", help="Directory for extracted MMS media attachments.")
+    parser.add_argument("--transcripts-dir", default="conversations_diarized", help="Directory containing diarized audio call transcripts.")
+    parser.add_argument("--no-transcripts", action="store_true", help="Skip interleaving diarized audio transcripts into Daily Notes.")
+    parser.add_argument("--manifest", default=None, help="Path to incremental XML manifest JSON file.")
+    parser.add_argument("--force", action="store_true", help="Force re-parsing of all XML and transcript files regardless of manifest state.")
+    parser.add_argument("--dry-run", action="store_true", help="Simulate ingestion without writing files.")
+    args = parser.parse_args()
 
-    # Final pass to interleave and sort everything
-    sort_daily_notes()
+    changed = False
+    if args.file:
+        count = parse_large_xml(args.file, output_dir=args.output_dir, media_dir=args.media_dir, dry_run=args.dry_run)
+        if count > 0:
+            changed = True
+    else:
+        xml_count = ingest_xml_directory(
+            input_dir=args.input_dir,
+            output_dir=args.output_dir,
+            media_dir=args.media_dir,
+            manifest_path=args.manifest,
+            force=args.force,
+            dry_run=args.dry_run
+        )
+        if xml_count > 0:
+            changed = True
+
+    if not args.no_transcripts:
+        t_manifest = args.manifest or os.path.join(args.input_dir, ".processed_xml_manifest.json")
+        t_count = ingest_diarized_transcripts(
+            transcripts_dir=args.transcripts_dir,
+            output_dir=args.output_dir,
+            manifest_path=t_manifest,
+            force=args.force,
+            dry_run=args.dry_run
+        )
+        if t_count > 0:
+            changed = True
+
+    if not args.dry_run and (changed or args.force or args.file):
+        sort_daily_notes(output_dir=args.output_dir)
+
+
+if __name__ == '__main__':
+    main()

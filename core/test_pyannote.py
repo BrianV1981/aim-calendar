@@ -1,11 +1,13 @@
 import os
-from pyannote.audio import Pipeline
 import sys
 
-HF_TOKEN = "REDACTED_HF_TOKEN"
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 def main():
+    if not HF_TOKEN:
+        raise RuntimeError("HF_TOKEN environment variable is required.")
     try:
+        from pyannote.audio import Pipeline
         print("Loading pipeline...")
         pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", token=HF_TOKEN)
         

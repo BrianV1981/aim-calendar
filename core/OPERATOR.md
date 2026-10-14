@@ -1,6 +1,6 @@
 # OPERATOR.md - Operator Record
 ## 👤 Basic Identity
-- **Name:** Brian Operator (B)
+- **Name:** Brian / King B
 - **Tech Stack:** LLMs / Vibe coding
 - **Style:** Novice
 

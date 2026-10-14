@@ -26,7 +26,14 @@
 
 ## [2026-09-10] ingest | Open Source / Community Migration Readiness
 *   Prepared the repository for open source and community sharing by thoroughly decoupling environment-specific paths.
-*   Replaced all hardcoded Python `sys.path.append("/home/kingb/aim-memory")` calls with a dynamic `AIM_MEMORY_PATH` environment variable across `core/build_cartridge.py`, `core/ingest_to_lancedb.py`, and `core/test_retrieval.py`.
+*   Replaced all hardcoded Python `sys.path.append(...)` host paths with a dynamic `AIM_MEMORY_PATH` environment variable across `core/build_cartridge.py`, `core/ingest_to_lancedb.py`, and `core/test_retrieval.py`.
 *   Appended `joshua_os/` to `.gitignore` to prevent leaking private operational workflows.
 *   Renamed the repository root on the local filesystem from `aim-talkeracr` to `aim-calendar` to properly match the upstream GitHub origin.
 *   Updated documentation (`HANDOFF.md`) and Systemd definitions (`core/systemd/aim-sync.*`) to reflect the new `aim-calendar` directory structure.
+
+## [2026-10-14] ingest | Audit Pass 1 Remediation (Issue #18: CAL-001 through CAL-011)
+*   **Secret & PII Remediation (`CAL-001`):** Stripped hardcoded `OPENAI_API_KEY` and `HF_TOKEN` credentials from `core/classify_calls.py`, `core/batch_diarize.py`, `core/benchmark_diarization.py`, and `core/test_pyannote.py`, and sanitized personal phone numbers/names across docs and tests.
+*   **Incremental XML Globbing & Manifest (`CAL-002`):** Upgraded `core/ingest_sms.py` with `argparse` CLI flags and `.processed_xml_manifest.json` tracking so newly synced `calls-*.xml` and `sms-*.xml` files are ingested incrementally without re-parsing the 11GB base backup.
+*   **Git & Open-Source Hygiene (`CAL-003`, `CAL-010`, `CAL-011`):** Executed `git rm -r --cached joshua_os` to untrack 106 `joshua_os/` files, removed root clutter (`test_pyannote.py`, `wiki_issue.txt`), added MIT `LICENSE`, updated `requirements.txt`, and synchronized `CHANGELOG.md` with `VERSION` (`v1.1.0`).
+*   **Pipeline Chaining, Transcript Interleaving & Local-First Classification (`CAL-004`, `CAL-005`, `CAL-007`):** Wired full audio pipeline chaining in `core/sync_daemon.sh`, implemented `ingest_diarized_transcripts` to interleave `conversations_diarized/*.md` into `conversations/daily_notes/YYYY-MM-DD.md`, and switched `core/classify_calls.py` to local Ollama by default.
+*   **Test Discovery & Dry-Run Integrity (`CAL-006`, `CAL-009`):** Guarded top-level execution in `core/test_fts.py` and `core/test_retrieval.py`, converted `core/test_classifier.py` to fast offline unit tests, and fixed `core/obsidian_vault.py --dry-run` side effects.

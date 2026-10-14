@@ -36,8 +36,8 @@ type: daily_exocortex
 ---
 # Daily Log: 2026-09-02
 
-- **[07:22 AM] Received Text** (+15550199993): "Hey Tampa Bay Soft Wash, need an estimate."
-- **[07:23 AM] Sent Text** (+15550199993): "Sure, what is the address?"
+- **[07:22 AM] Received Text** (+15550100100): "Hey Tampa Bay Soft Wash, need an estimate."
+- **[07:23 AM] Sent Text** (+15550100100): "Sure, what is the address?"
 - **[01:00 PM] Received MMS** (Jessica): "Here is the roof photo"
   ![MMS Image](../media/roof.jpg)
   > Steep pitch tile roof

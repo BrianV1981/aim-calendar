@@ -4,7 +4,13 @@ import tempfile
 import shutil
 import base64
 import hashlib
-from core.ingest_sms import parse_large_xml, sort_daily_notes, extract_mms_parts
+from core.ingest_sms import (
+    parse_large_xml,
+    sort_daily_notes,
+    extract_mms_parts,
+    ingest_xml_directory,
+    ingest_diarized_transcripts
+)
 
 # 1x1 transparent GIF base64 string
 DUMMY_GIF_B64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
@@ -33,8 +39,8 @@ class TestIngestSMS(unittest.TestCase):
         """Test standard SMS and Call log parsing."""
         xml_content = """<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <smses count="2">
-  <call number="7275551234" duration="45" type="1" date="1672574400000" contact_name="Alice" />
-  <sms protocol="0" address="7275555678" date="1672578000000" type="1" subject="null" body="Hello from test!" contact_name="Bob" />
+  <call number="5550101234" duration="45" type="1" date="1672574400000" contact_name="Alice" />
+  <sms protocol="0" address="5550105678" date="1672578000000" type="1" subject="null" body="Hello from test!" contact_name="Bob" />
 </smses>"""
         xml_path = os.path.join(self.test_dir, "test_basic.xml")
         with open(xml_path, "w", encoding="utf-8") as f:
@@ -58,15 +64,15 @@ class TestIngestSMS(unittest.TestCase):
         """Test MMS base64 image decoding, file writing, and markdown linking."""
         xml_content = f"""<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <smses count="1">
-  <mms date="1672581600000" msg_box="1" address="7275559999" contact_name="Charlie">
+  <mms date="1672581600000" msg_box="1" address="5550109999" contact_name="Charlie">
     <parts>
       <part seq="-1" ct="application/smil" name="smil.xml" text="&lt;smil&gt;&lt;/smil&gt;" />
       <part seq="0" ct="text/plain" name="text_0.txt" text="Here is the estimate screenshot" />
       <part seq="1" ct="image/gif" name="estimate.gif" data="{DUMMY_GIF_B64}" text="null" />
     </parts>
     <addrs>
-      <addr address="7275559999" type="137" />
-      <addr address="5550199992" type="151" />
+      <addr address="5550109999" type="137" />
+      <addr address="5550100100" type="151" />
     </addrs>
   </mms>
 </smses>"""
@@ -101,12 +107,12 @@ class TestIngestSMS(unittest.TestCase):
         """Test that identical payloads are not duplicated on disk."""
         xml_content = f"""<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <smses count="2">
-  <mms date="1672581600000" msg_box="1" address="7275559999" contact_name="Charlie">
+  <mms date="1672581600000" msg_box="1" address="5550109999" contact_name="Charlie">
     <parts>
       <part seq="0" ct="image/png" name="pic1.png" data="{DUMMY_PNG_B64}" />
     </parts>
   </mms>
-  <mms date="1672585200000" msg_box="2" address="7275559999" contact_name="Charlie">
+  <mms date="1672585200000" msg_box="2" address="5550109999" contact_name="Charlie">
     <parts>
       <part seq="0" ct="image/png" name="pic1_copy.png" data="{DUMMY_PNG_B64}" />
     </parts>
@@ -160,17 +166,17 @@ type: daily_exocortex
         dummy_data = base64.b64encode(b"binary content").decode("ascii")
         xml_content = f"""<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <smses count="3">
-  <mms date="1672581600000" msg_box="1" address="7275551111" contact_name="Dana">
+  <mms date="1672581600000" msg_box="1" address="5550101111" contact_name="Dana">
     <parts>
       <part seq="0" ct="video/mp4" name="video.mp4" data="{dummy_data}" />
     </parts>
   </mms>
-  <mms date="1672585200000" msg_box="1" address="7275551111" contact_name="Dana">
+  <mms date="1672585200000" msg_box="1" address="5550101111" contact_name="Dana">
     <parts>
       <part seq="0" ct="audio/amr" name="voice.amr" data="{dummy_data}" />
     </parts>
   </mms>
-  <mms date="1672588800000" msg_box="1" address="7275551111" contact_name="Dana">
+  <mms date="1672588800000" msg_box="1" address="5550101111" contact_name="Dana">
     <parts>
       <part seq="0" ct="application/pdf" name="doc.pdf" data="{dummy_data}" />
     </parts>
@@ -199,7 +205,7 @@ type: daily_exocortex
       <part seq="0" ct="text/plain" text="Message from unknown sender" />
     </parts>
     <addrs>
-      <addr address="7278889999" type="137" />
+      <addr address="5550108888" type="137" />
     </addrs>
   </mms>
 </smses>"""
@@ -213,8 +219,99 @@ type: daily_exocortex
         with open(daily_note, "r", encoding="utf-8") as f:
             content = f.read()
 
-        self.assertIn("7278889999", content)
+        self.assertIn("5550108888", content)
         self.assertIn("Message from unknown sender", content)
+
+    def test_incremental_xml_directory_globbing(self):
+        """Test directory globbing and manifest-based incremental skipping (CAL-002)."""
+        raw_dir = os.path.join(self.test_dir, "sms_raw")
+        os.makedirs(raw_dir, exist_ok=True)
+        manifest_path = os.path.join(raw_dir, ".processed_xml_manifest.json")
+
+        calls_xml = """<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<calls count="1">
+  <call number="5550101234" duration="30" type="1" date="1672574400000" contact_name="Alice" />
+</calls>"""
+        sms_xml = """<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<smses count="1">
+  <sms protocol="0" address="5550105678" date="1672578000000" type="1" body="Incremental SMS!" contact_name="Bob" />
+</smses>"""
+
+        with open(os.path.join(raw_dir, "calls-20261001000000.xml"), "w", encoding="utf-8") as f:
+            f.write(calls_xml)
+        with open(os.path.join(raw_dir, "sms-20261001000000.xml"), "w", encoding="utf-8") as f:
+            f.write(sms_xml)
+
+        # First run should parse both files
+        count1 = ingest_xml_directory(
+            input_dir=raw_dir,
+            output_dir=self.notes_dir,
+            media_dir=self.media_dir,
+            manifest_path=manifest_path
+        )
+        self.assertEqual(count1, 2)
+        self.assertTrue(os.path.exists(manifest_path))
+
+        # Second incremental run should skip both already-ingested files
+        count2 = ingest_xml_directory(
+            input_dir=raw_dir,
+            output_dir=self.notes_dir,
+            media_dir=self.media_dir,
+            manifest_path=manifest_path
+        )
+        self.assertEqual(count2, 0)
+
+        # Force run should re-parse both files
+        count3 = ingest_xml_directory(
+            input_dir=raw_dir,
+            output_dir=self.notes_dir,
+            media_dir=self.media_dir,
+            manifest_path=manifest_path,
+            force=True
+        )
+        self.assertEqual(count3, 2)
+
+    def test_ingest_diarized_transcripts(self):
+        """Test interleaving diarized audio transcripts into Daily Notes (CAL-005)."""
+        t_dir = os.path.join(self.test_dir, "conversations_diarized")
+        os.makedirs(t_dir, exist_ok=True)
+        manifest_path = os.path.join(self.test_dir, ".manifest.json")
+
+        t_content = """---
+platform: phone
+date: 20230101-143000
+contact: "+15550100100"
+duration: 120.50s
+tags: [phone-call, talker-acr]
+status: golden
+model: large-v3 + pyannote
+---
+
+# Transcript
+
+[SPEAKER_00] [0.40s -> 5.86s] Hello, checking on the schedule.
+[SPEAKER_01] [6.24s -> 9.80s] We are all set for tomorrow morning.
+"""
+        t_path = os.path.join(t_dir, "phone_20230101-143000__15550100100.md")
+        with open(t_path, "w", encoding="utf-8") as f:
+            f.write(t_content)
+
+        linked = ingest_diarized_transcripts(
+            transcripts_dir=t_dir,
+            output_dir=self.notes_dir,
+            manifest_path=manifest_path
+        )
+        self.assertEqual(linked, 1)
+
+        daily_note = os.path.join(self.notes_dir, "2023-01-01.md")
+        self.assertTrue(os.path.exists(daily_note))
+        with open(daily_note, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn("Audio Call Transcript", content)
+        self.assertIn("+15550100100", content)
+        self.assertIn("[SPEAKER_00]", content)
+        self.assertIn("Full Transcript", content)
 
 
 if __name__ == '__main__':

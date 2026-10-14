@@ -91,18 +91,34 @@ def setup_vault(
     vault_dir: str,
     daily_notes_folder: str = "daily_notes",
     media_folder: str = "media",
-    install_plugin: bool = True
+    install_plugin: bool = True,
+    dry_run: bool = False
 ) -> Dict[str, str]:
     """
     Initializes a formal Obsidian Vault structure within `vault_dir`.
     Creates .obsidian/, app.json, core-plugins.json, daily-notes.json,
     and installs the Calendar community plugin.
+    When `dry_run=True`, returns planned files without touching the filesystem.
     """
     vault_dir = os.path.abspath(vault_dir)
     obsidian_dir = os.path.join(vault_dir, ".obsidian")
-    os.makedirs(obsidian_dir, exist_ok=True)
 
-    created_files = {}
+    created_files = {
+        "app.json": os.path.join(obsidian_dir, "app.json"),
+        "core-plugins.json": os.path.join(obsidian_dir, "core-plugins.json"),
+        "daily-notes.json": os.path.join(obsidian_dir, "daily-notes.json"),
+        "community-plugins.json": os.path.join(obsidian_dir, "community-plugins.json"),
+    }
+    if install_plugin:
+        plugin_dir = os.path.join(obsidian_dir, "plugins", "calendar")
+        created_files["manifest.json"] = os.path.join(plugin_dir, "manifest.json")
+        created_files["data.json"] = os.path.join(plugin_dir, "data.json")
+        created_files["main.js"] = os.path.join(plugin_dir, "main.js")
+
+    if dry_run:
+        return created_files
+
+    os.makedirs(obsidian_dir, exist_ok=True)
 
     # 1. app.json
     app_config = {
@@ -117,16 +133,14 @@ def setup_vault(
             "*.lance/"
         ]
     }
-    app_json_path = os.path.join(obsidian_dir, "app.json")
+    app_json_path = created_files["app.json"]
     with open(app_json_path, "w", encoding="utf-8") as f:
         json.dump(app_config, f, indent=2)
-    created_files["app.json"] = app_json_path
 
     # 2. core-plugins.json
-    core_plugins_path = os.path.join(obsidian_dir, "core-plugins.json")
+    core_plugins_path = created_files["core-plugins.json"]
     with open(core_plugins_path, "w", encoding="utf-8") as f:
         json.dump(CORE_PLUGINS_CONFIG, f, indent=2)
-    created_files["core-plugins.json"] = core_plugins_path
 
     # 3. daily-notes.json
     daily_notes_config = {
@@ -134,13 +148,12 @@ def setup_vault(
         "folder": daily_notes_folder,
         "template": ""
     }
-    daily_notes_path = os.path.join(obsidian_dir, "daily-notes.json")
+    daily_notes_path = created_files["daily-notes.json"]
     with open(daily_notes_path, "w", encoding="utf-8") as f:
         json.dump(daily_notes_config, f, indent=2)
-    created_files["daily-notes.json"] = daily_notes_path
 
     # 4. community-plugins.json
-    comm_plugins_path = os.path.join(obsidian_dir, "community-plugins.json")
+    comm_plugins_path = created_files["community-plugins.json"]
     enabled_plugins = ["calendar"]
     if os.path.exists(comm_plugins_path):
         try:
@@ -154,37 +167,32 @@ def setup_vault(
             pass
     with open(comm_plugins_path, "w", encoding="utf-8") as f:
         json.dump(enabled_plugins, f, indent=2)
-    created_files["community-plugins.json"] = comm_plugins_path
 
     # 5. plugins/calendar/
     if install_plugin:
         plugin_dir = os.path.join(obsidian_dir, "plugins", "calendar")
         os.makedirs(plugin_dir, exist_ok=True)
 
-        manifest_path = os.path.join(plugin_dir, "manifest.json")
+        manifest_path = created_files["manifest.json"]
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(CALENDAR_MANIFEST, f, indent=2)
-        created_files["manifest.json"] = manifest_path
 
-        data_path = os.path.join(plugin_dir, "data.json")
+        data_path = created_files["data.json"]
         with open(data_path, "w", encoding="utf-8") as f:
             json.dump(CALENDAR_DATA, f, indent=2)
-        created_files["data.json"] = data_path
 
         # Copy or deploy main.js
-        main_js_dest = os.path.join(plugin_dir, "main.js")
+        main_js_dest = created_files["main.js"]
         asset_dir = get_plugin_asset_dir()
         asset_main_js = os.path.join(asset_dir, "main.js")
 
         if os.path.exists(asset_main_js):
             shutil.copyfile(asset_main_js, main_js_dest)
-            created_files["main.js"] = main_js_dest
         else:
             # Fallback placeholder if asset not present
             if not os.path.exists(main_js_dest):
                 with open(main_js_dest, "w", encoding="utf-8") as f:
                     f.write("/* Liam Cain Calendar Plugin bundle placeholder */\n")
-                created_files["main.js"] = main_js_dest
 
     return created_files
 
@@ -376,14 +384,17 @@ def main():
         daily_folder = "conversations/daily_notes" if is_root else "daily_notes"
         media_folder = "conversations/media" if is_root else "media"
 
-        print(f"\nInitializing Obsidian Vault at: {vt}")
+        action_str = "[DRY-RUN] Would initialize" if args.dry_run else "Initializing"
+        print(f"\n{action_str} Obsidian Vault at: {vt}")
         res = setup_vault(
             vault_dir=vt,
             daily_notes_folder=daily_folder,
             media_folder=media_folder,
-            install_plugin=(not args.no_plugin)
+            install_plugin=(not args.no_plugin),
+            dry_run=args.dry_run
         )
-        print(f"  [OK] Configured {len(res)} files (.obsidian/ config & Calendar plugin).")
+        ok_str = "[DRY-RUN] Planned" if args.dry_run else "[OK] Configured"
+        print(f"  {ok_str} {len(res)} files (.obsidian/ config & Calendar plugin).")
 
     if args.migrate_tags:
         print(f"\nScanning Daily Notes in {notes_dir} for Calendar tags...")

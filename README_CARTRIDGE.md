@@ -3,13 +3,13 @@
 
 ## 📦 What is this?
 This is a fully self-contained **LanceDB Vector Database Cartridge**. 
-It contains the permanent memory of Brian Operator's phone calls, processed and transcribed from the Android Talker ACR app.
+It contains the permanent memory of the Operator's phone calls, processed and transcribed from the Android Talker ACR app.
 
 This cartridge is specifically designed to be "plugged in" to the **A.I.M. Joshua OS** via the `aim-memory` engine (RAG 5.21 architecture). It provides Joshua OS with immediate, mathematically verified recall of a lifetime of phone conversations.
 
 ## 📊 Database Statistics
 *   **Total Audio Files Processed:** 13,539 AMR files
-*   **Total Golden Phone Calls Transcribed:** 10,468 (via OpenAI / Pyannote)
+*   **Total Golden Phone Calls Transcribed:** 10,468 (via Local Classifier / Pyannote)
 *   **Total Unique Conversations Vectorized:** 10,198 (Files with 0 dialogue were excluded)
 *   **Vector Engine:** Ollama `nomic-embed-text` (768-dimensional)
 *   **Search Infrastructure:** Native LanceDB Vector + Tantivy Full-Text Search (FTS)
@@ -20,8 +20,8 @@ This cartridge is specifically designed to be "plugged in" to the **A.I.M. Joshu
 Every chunk in this LanceDB database contains the raw text utterance and its surrounding context, as well as the following strict metadata payload:
 ```json
 {
-  "source_file": "phone_20260107-125504__15550199991.md",
-  "contact": "15550199991",
+  "source_file": "phone_20260107-125504__15550100100.md",
+  "contact": "15550100100",
   "date": "2026-01-07",
   "turn_index": "45",
   "timestamp": "42.5s"

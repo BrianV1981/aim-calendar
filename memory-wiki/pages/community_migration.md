@@ -4,8 +4,8 @@ As of **September 10, 2026**, the `aim-calendar` repository has been fully decou
 
 ## Core Decoupling Operations
 1. **Local Path Standardization:** The root repository folder has been formally unified as `aim-calendar` across both local checkouts and upstream GitHub tracking, eliminating prior discrepancies (e.g., `aim-talkeracr`).
-2. **Environment Isolation:** The sovereign `joshua_os` agent framework directory has been added to `.gitignore` to prevent operational leakages.
-3. **Dynamic Integrations:** All hardcoded system paths (e.g., `/home/kingb`) have been stripped from the `core/` pipeline logic.
+2. **Environment Isolation:** The sovereign `joshua_os` agent framework directory has been added to `.gitignore` and untracked via `git rm --cached` to prevent operational leakages.
+3. **Dynamic Integrations:** All hardcoded host-specific system paths have been stripped from the `core/` pipeline logic and documentation.
 
 ## Environment Variable Configuration (`AIM_MEMORY_PATH`)
 

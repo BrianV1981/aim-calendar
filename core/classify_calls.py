@@ -2,15 +2,19 @@ import os
 import re
 import json
 import time
-from openai import OpenAI
+import requests
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
 
 INPUT_DIR = "conversations"
+CLASSIFIER_PROVIDER = os.environ.get("AIM_CLASSIFIER_PROVIDER", "ollama").lower()
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
+OLLAMA_MODEL = os.environ.get("OLLAMA_CLASSIFIER_MODEL", "qwen3.5:4b")
 
-def ask_openai(transcript):
-    """Sends the transcript to OpenAI API to classify it."""
-    client = OpenAI(api_key="REDACTED_OPENAI_API_KEY")
-    
-    prompt = f"""You are an audio transcript classifier.
+CLASSIFIER_PROMPT_TEMPLATE = """You are an audio transcript classifier.
 Read the following transcript snippet. Determine if it represents a REAL human conversation or a GARBAGE call (like a voicemail, pocket dial, silent hang-up, or background noise).
 Reply ONLY with the exact word "golden" if it is a real conversation.
 Reply ONLY with the exact word "garbage" if it is not a real conversation. Do not provide any other explanation.
@@ -18,7 +22,43 @@ Reply ONLY with the exact word "garbage" if it is not a real conversation. Do no
 Transcript:
 {transcript}
 """
-    
+
+
+def ask_ollama(transcript):
+    """Classifies the transcript locally using Ollama (100% local / air-gapped default)."""
+    prompt = CLASSIFIER_PROMPT_TEMPLATE.format(transcript=transcript)
+    data = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "options": {"temperature": 0.0}
+    }
+    try:
+        response = requests.post(OLLAMA_URL, json=data, timeout=30)
+        response.raise_for_status()
+        result = response.json().get("response", "").strip().lower()
+        if "golden" in result:
+            return "golden"
+        elif "garbage" in result:
+            return "garbage"
+        else:
+            return "unknown"
+    except Exception as e:
+        print(f"Error querying local Ollama ({OLLAMA_URL}): {e}")
+        return "error"
+
+
+def ask_openai(transcript):
+    """Optional cloud fallback: sends the transcript to OpenAI API if OPENAI_API_KEY is set."""
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY environment variable is required when using the OpenAI classifier.")
+    if OpenAI is None:
+        raise RuntimeError("openai package is not installed.")
+
+    client = OpenAI(api_key=api_key)
+    prompt = CLASSIFIER_PROMPT_TEMPLATE.format(transcript=transcript)
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -28,20 +68,27 @@ Transcript:
             temperature=0.0,
             max_tokens=10
         )
-        
+
         result = response.choices[0].message.content.strip().lower()
-        
-        # Clean up any weird punctuation the LLM might have added
+
         if "golden" in result:
             return "golden"
         elif "garbage" in result:
             return "garbage"
         else:
             return "unknown"
-            
+
     except Exception as e:
         print(f"Error querying OpenAI: {e}")
         return "error"
+
+
+def classify_transcript(transcript):
+    """Routes classification to local Ollama by default, or OpenAI if configured."""
+    if CLASSIFIER_PROVIDER == "openai":
+        return ask_openai(transcript)
+    return ask_ollama(transcript)
+
 
 def classify_files():
     if not os.path.exists(INPUT_DIR):
@@ -50,8 +97,9 @@ def classify_files():
 
     files = [f for f in os.listdir(INPUT_DIR) if f.endswith('.md')]
     total = len(files)
-    
-    print(f"Starting classification of {total} files using OpenAI gpt-4o-mini...")
+
+    provider_desc = f"local Ollama ({OLLAMA_MODEL})" if CLASSIFIER_PROVIDER != "openai" else "OpenAI gpt-4o-mini"
+    print(f"Starting classification of {total} files using {provider_desc}...")
     
     processed = 0
     golden = 0
@@ -84,7 +132,7 @@ def classify_files():
             status = "garbage"
         else:
             # We don't need to send the whole file, just the first 1000 characters is usually enough to tell
-            status = ask_openai(transcript[:1000])
+            status = classify_transcript(transcript[:1000])
             
         if status in ["error", "unknown"]:
             print(f"[{idx}/{total}] Failed to classify {filename} (returned {status})")

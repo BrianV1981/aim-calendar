@@ -123,7 +123,11 @@ sync_source() {
 
         # Test if remote directory exists / is accessible
         if ! rclone lsf "$remote" --max-depth 1 >/dev/null 2>&1; then
-            log "[WARN] Remote path $remote unreachable or does not exist. Skipping."
+            if [ "$label" = "Audio/TalkerACR" ]; then
+                log "[INFO] Remote audio path $remote not found on Google Drive (created automatically when Talker ACR uploads new recordings, or override via GDRIVE_AUDIO_PATH). Skipping."
+            else
+                log "[WARN] Remote path $remote unreachable or does not exist. Skipping."
+            fi
             echo 0
             return 0
         fi
@@ -143,7 +147,7 @@ sync_source() {
     fi
 
     # Unpack any new zip archives in SMS folder (e.g. from Ad-Free SMS backups)
-    if [ "$label" = "SMS/Texts" ] && [ "$DRY_RUN" = "0" ]; then
+    if ( [ "$label" = "SMS/Texts" ] || [ "$label" = "Ad-Free SMS Backups" ] ) && [ "$DRY_RUN" = "0" ]; then
         for zip_file in "$local_dest"/*.zip; do
             if [ -f "$zip_file" ]; then
                 local marker="${zip_file}.extracted"
@@ -206,22 +210,23 @@ trigger_downstream_pipelines() {
         fi
     fi
 
-    # 2. Audio Diarization / Transcription Trigger
+    # 2. Full Audio Ingestion, Classification, Diarization & Cartridge Pipeline Trigger
     if [ "$new_audio_count" -gt 0 ] || [ "$FORCE_PIPELINE" = "1" ]; then
         if [ "$RUN_DIARIZE" = "1" ] && [ -f "${REPO_ROOT}/core/batch_diarize.py" ]; then
-            log "[PIPELINE] New audio files detected. Launching detached diarization session 'aim_diarize' via tmux..."
+            log "[PIPELINE] New audio files detected. Launching full detached audio pipeline session 'aim_diarize' via tmux..."
             if command -v tmux >/dev/null 2>&1; then
                 if tmux has-session -t aim_diarize 2>/dev/null; then
                     log "[INFO] Tmux session 'aim_diarize' is already running. Not launching a duplicate."
                 else
-                    tmux new-session -d -s aim_diarize "cd '$REPO_ROOT' && '$PYTHON_BIN' core/batch_diarize.py >> '$LOG_FILE' 2>&1"
-                    log "[SUCCESS] Tmux session 'aim_diarize' spawned in detached background."
+                    local audio_cmd="cd '$REPO_ROOT' && '$PYTHON_BIN' core/batch_ingest.py >> '$LOG_FILE' 2>&1 && '$PYTHON_BIN' core/classify_calls.py >> '$LOG_FILE' 2>&1 && '$PYTHON_BIN' core/batch_diarize.py >> '$LOG_FILE' 2>&1 && '$PYTHON_BIN' core/build_cartridge.py >> '$LOG_FILE' 2>&1 && '$PYTHON_BIN' core/ingest_sms.py >> '$LOG_FILE' 2>&1 && '$PYTHON_BIN' core/ingest_to_lancedb.py >> '$LOG_FILE' 2>&1"
+                    tmux new-session -d -s aim_diarize "$audio_cmd"
+                    log "[SUCCESS] Tmux session 'aim_diarize' (batch_ingest -> classify_calls -> batch_diarize -> build_cartridge -> ingest_sms -> ingest_to_lancedb) spawned in detached background."
                 fi
             else
                 log "[WARN] Tmux not installed; cannot launch detached audio diarization safely."
             fi
         else
-            log "[PIPELINE] New audio files downloaded. (Run with --run-diarize to auto-spawn diarization)."
+            log "[PIPELINE] New audio files downloaded. (Run with --run-diarize to auto-spawn full audio pipeline)."
         fi
     fi
 }

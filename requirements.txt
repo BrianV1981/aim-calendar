@@ -1,4 +1,9 @@
 faster-whisper
+pyannote.audio
 requests
 lancedb
 pyarrow
+pandas
+pyyaml
+openai
+

@@ -18,7 +18,7 @@
 | 46a36164 | **Issue #2 (LanceDB Daily Notes Vector Injection):** Implemented `core/ingest_to_lancedb.py` with sliding window temporal chunking, date anchoring (`[Date: YYYY-MM-DD]`), multiline bullet group preservation, idempotent session tracking against `talker_cartridge.lance` table `fragments` (`type: "daily_note"`), 768-dim `nomic-embed-text` embeddings, table optimization, and FTS indexing. Tested with 3 unit tests in `core/test_ingest_to_lancedb.py`. Promoted to `main`. | ✅ RESOLVED |
 | 46a36164 | **Issue #3 (Obsidian Calendar UI & Vault Integration):** Implemented `core/obsidian_vault.py` with turnkey `.obsidian/` vault generation, Liam Cain's official Calendar community plugin preconfigured, and standardized YAML frontmatter across 2,031 Daily Notes with tags (`daily-note`, `calendar`, `timeline`, `exocortex`). Tested with 6 unit tests in `core/test_obsidian_vault.py`. Promoted to `main`. | ✅ RESOLVED |
 | 46a36164 | **Issues #5 & #7 (Memory Wiki Architecture Updates):** Formalized architecture and operational runbooks in `memory-wiki/pages/architecture.md` and `memory-wiki/pages/obsidian_calendar_integration.md`. Promoted to `main`. | ✅ RESOLVED |
-| 46a36164 | **Open Source Migration (Issues #8-#11):** Stripped hardcoded `/home/kingb` paths, replaced with dynamic `AIM_MEMORY_PATH` variables, ignored `joshua_os`, and unified local directory as `aim-calendar`. Wiki fully updated. | ✅ RESOLVED |
+| 46a36164 | **Open Source Migration (Issues #8-#11):** Stripped hardcoded user-specific paths, replaced with dynamic `AIM_MEMORY_PATH` variables, ignored `joshua_os`, and unified local directory as `aim-calendar`. Wiki fully updated. | ✅ RESOLVED |
 
 ---
 
@@ -26,12 +26,12 @@
 A.I.M. Calendar (Actual Intelligent Memory Calendar) is an Enterprise Exocortex that unifies chronological phone call transcripts and SMS logs into a searchable, multimodal vector database (LanceDB). It uses a local-first GitOps architecture managed by the **Joshua OS Sovereign Co-Agent**.
 
 ### Your Knowledge Base
-*   **Root Documentation:** `/home/kingb/aim-calendar/memory-wiki/index.md`
-*   **Architecture:** `/home/kingb/aim-calendar/memory-wiki/pages/architecture.md`
-*   **Obsidian Integration:** `/home/kingb/aim-calendar/memory-wiki/pages/obsidian_calendar_integration.md`
-*   **MMS Translation Pipeline:** `/home/kingb/aim-calendar/memory-wiki/pages/mms_multimodal_translation.md`
-*   **Tools Registry:** `/home/kingb/aim-calendar/TOOLS.md`
-*   **Joshua OS Rules:** `/home/kingb/aim-calendar/AGENTS.md` (MUST READ for GitOps workflow `aim fix` / `aim promote`)
+*   **Root Documentation:** `memory-wiki/index.md`
+*   **Architecture:** `memory-wiki/pages/architecture.md`
+*   **Obsidian Integration:** `memory-wiki/pages/obsidian_calendar_integration.md`
+*   **MMS Translation Pipeline:** `memory-wiki/pages/mms_multimodal_translation.md`
+*   **Tools Registry:** `TOOLS.md`
+*   **Joshua OS Rules:** `AGENTS.md` (MUST READ for GitOps workflow `aim fix` / `aim promote`)
 
 ---
 
@@ -47,7 +47,7 @@ The Phase 1 Core Architecture is officially complete, fully tested, and open-sou
 ---
 
 ## 3. DETAILED ANALYSIS / BREAKDOWN
-All foundational data engineering pipelines (MMS Extraction, LanceDB Vector Injection, Sync Daemon, Obsidian Vault generator) are stable and fully documented in the `memory-wiki`. The environment has been formally decoupled from local `/home/kingb/` configurations to enable seamless community sharing. The `AIM_MEMORY_PATH` environment variable now dynamically dictates the memory dependencies.
+All foundational data engineering pipelines (MMS Extraction, LanceDB Vector Injection, Sync Daemon, Obsidian Vault generator) are stable and fully documented in the `memory-wiki`. The environment has been formally decoupled from local host-specific configurations to enable seamless community sharing. The `AIM_MEMORY_PATH` environment variable now dynamically dictates the memory dependencies.
 
 ---
 

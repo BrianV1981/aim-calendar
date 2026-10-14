@@ -169,6 +169,19 @@ class TestObsidianVault(unittest.TestCase):
         self.assertEqual(updated_count2, 0)
         self.assertEqual(total_count2, 3)
 
+    def test_setup_vault_dry_run_no_side_effects(self):
+        """Test setup_vault with dry_run=True does not create .obsidian/ directory (CAL-009)."""
+        planned = setup_vault(
+            vault_dir=self.test_dir,
+            daily_notes_folder="daily_notes",
+            media_folder="media",
+            install_plugin=True,
+            dry_run=True
+        )
+        self.assertGreater(len(planned), 0)
+        obsidian_dir = os.path.join(self.test_dir, ".obsidian")
+        self.assertFalse(os.path.exists(obsidian_dir), "Dry run must not create .obsidian/ on disk.")
+
 
 if __name__ == "__main__":
     unittest.main()

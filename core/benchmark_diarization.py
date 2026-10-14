@@ -5,7 +5,7 @@ from pyannote.audio import Pipeline
 # Paths
 BENCHMARK_DIR = "benchmark"
 MODEL_SIZE = "large-v3"
-HF_TOKEN = "REDACTED_HF_TOKEN"
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 def get_speaker_for_segment(segment, diarization):
     """Finds the speaker who spoke the most during this whisper segment."""
@@ -38,6 +38,8 @@ def get_speaker_for_segment(segment, diarization):
     return max(speaker_overlaps, key=speaker_overlaps.get)
 
 def run_diarization():
+    if not HF_TOKEN:
+        raise RuntimeError("HF_TOKEN environment variable is required for Pyannote diarization.")
     folders = [f for f in os.listdir(BENCHMARK_DIR) if os.path.isdir(os.path.join(BENCHMARK_DIR, f))]
     
     if not folders:
