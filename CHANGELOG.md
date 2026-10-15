@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 - **Unified Hybrid LLM & Vision Provider Adapter (`core/llm_provider.py`):** Added unified `ollama` (`qwen2.5vl:3b` / `qwen3.5:4b`) and `gemini` (`gemini-2.5-flash`) provider switch (`AIM_LLM_PROVIDER=auto|ollama|gemini`) with automatic `.env` loading and offline fallback.
 - **Multimodal Visual Translation Pipeline (Issue #13, `core/translate_media.py`):** Implemented the `locomo-v2` visual translation engine that scans `conversations/daily_notes/*.md` for MMS media links, generates OCR/visual descriptions via `core/llm_provider.py`, caches results in `conversations/media/.visual_translation_cache.json`, injects `> [Visual Context: ...]` blockquotes into Daily Notes, and triggers incremental LanceDB re-indexing of modified Daily Notes.
+- **Calendar Intelligence & Google Calendar Sync Engine (Issue #14, `core/calendar_sync.py`):** Implemented dual-track calendar extraction separating Retrospective Daily Dossiers (`A.I.M. Activity Log`) from Prospective Appointments (`A.I.M. Appointments`), backed by canonical local state (`conversations/calendar/.calendar_state.json`), RFC-5545 `.ics` feeds (`aim_activity_log.ics`, `aim_appointments.ics`), deterministic `extendedProperties.private.aim_event_id` deduplication on Google Calendar API v3, and a privacy gate filtering out `GARBAGE` entries.
 
 ## [1.1.0] - 2026-10-14
 ### Added

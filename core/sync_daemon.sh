@@ -270,6 +270,12 @@ trigger_downstream_pipelines() {
                     log "[WARN] core/ingest_to_lancedb.py finished with warnings/errors (see $LOG_FILE)."
                 }
             fi
+            if [ -f "${REPO_ROOT}/core/calendar_sync.py" ]; then
+                log "[PIPELINE] Running core/calendar_sync.py (Dossiers, Appointments & Calendar Sync)..."
+                (cd "$REPO_ROOT" && "$PYTHON_BIN" "core/calendar_sync.py" --recent 3 >> "$LOG_FILE" 2>&1) || {
+                    log "[WARN] core/calendar_sync.py finished with warnings/errors (see $LOG_FILE)."
+                }
+            fi
         else
             log "[WARN] core/ingest_sms.py not found. Skipping SMS pipeline."
         fi
