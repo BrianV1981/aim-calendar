@@ -4,6 +4,11 @@ All notable changes to the **A.I.M. Calendar** (formerly TalkerACR Ingestion) pr
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-10-14
+### Added
+- **Unified Hybrid LLM & Vision Provider Adapter (`core/llm_provider.py`):** Added unified `ollama` (`qwen2.5vl:3b` / `qwen3.5:4b`) and `gemini` (`gemini-2.5-flash`) provider switch (`AIM_LLM_PROVIDER=auto|ollama|gemini`) with automatic `.env` loading and offline fallback.
+- **Multimodal Visual Translation Pipeline (Issue #13, `core/translate_media.py`):** Implemented the `locomo-v2` visual translation engine that scans `conversations/daily_notes/*.md` for MMS media links, generates OCR/visual descriptions via `core/llm_provider.py`, caches results in `conversations/media/.visual_translation_cache.json`, injects `> [Visual Context: ...]` blockquotes into Daily Notes, and triggers incremental LanceDB re-indexing of modified Daily Notes.
+
 ## [1.1.0] - 2026-10-14
 ### Added
 - **Incremental XML Globbing & Manifest Ledger (`CAL-002`):** Upgraded `core/ingest_sms.py` with full CLI `argparse` flags (`--input-dir`, `--file`, `--force`, `--dry-run`, `--manifest`) and `.processed_xml_manifest.json` tracking so newly synced `calls-*.xml` and `sms-*.xml` files are ingested incrementally without re-parsing historical 11GB backups.

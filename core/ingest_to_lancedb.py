@@ -262,6 +262,19 @@ def ingest_daily_notes(
     total_files = len(files)
     print(f"Found {total_files} Daily Notes to process.")
 
+    manifest_path = os.path.join(input_dir, ".processed_lancedb_manifest.json")
+    manifest: Dict[str, Dict] = {"notes": {}}
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as mf:
+                loaded = json.load(mf)
+                if isinstance(loaded, dict):
+                    loaded.setdefault("notes", {})
+                    manifest = loaded
+        except Exception:
+            pass
+
+    manifest_dirty = False
     total_chunks_inserted = 0
     batch_records = []
     processed_files = 0
@@ -269,10 +282,22 @@ def ingest_daily_notes(
 
     for idx, filepath in enumerate(files, 1):
         filename = os.path.basename(filepath)
+        try:
+            file_size = os.path.getsize(filepath)
+        except OSError:
+            continue
 
         if filename in completed_files and not force:
-            skipped_files += 1
-            continue
+            recorded_meta = manifest["notes"].get(filename)
+            if recorded_meta is None:
+                # Bootstrap existing indexed note size without re-embedding
+                manifest["notes"][filename] = {"size": file_size}
+                manifest_dirty = True
+                skipped_files += 1
+                continue
+            if recorded_meta.get("size") == file_size:
+                skipped_files += 1
+                continue
 
         metadata, entries = parse_daily_note(filepath)
         date_str = metadata.get("date", "unknown")
@@ -280,8 +305,8 @@ def ingest_daily_notes(
         if not entries:
             continue
 
-        # If force re-indexing, remove prior entries for this file
-        if force and not dry_run and filename in completed_files:
+        # If force re-indexing or re-indexing a modified Daily Note, remove prior entries for this file
+        if not dry_run and filename in completed_files:
             try:
                 table.delete(f"session_id = '{filename}'")
             except Exception:
@@ -325,6 +350,8 @@ def ingest_daily_notes(
             current_id += 1
             total_chunks_inserted += 1
 
+        manifest["notes"][filename] = {"size": file_size}
+        manifest_dirty = True
         processed_files += 1
 
         # Flush batch periodically
@@ -337,6 +364,13 @@ def ingest_daily_notes(
     if batch_records and not dry_run:
         table.add(batch_records)
         print(f"  ...flushed final {len(batch_records)} chunks to LanceDB.")
+
+    if manifest_dirty and not dry_run and os.path.isdir(input_dir):
+        try:
+            with open(manifest_path, "w", encoding="utf-8") as mf:
+                json.dump(manifest, mf, indent=2, sort_keys=True)
+        except OSError:
+            pass
 
     print(f"\n=== DAILY NOTE INGESTION COMPLETE ===")
     print(f"Files processed: {processed_files} (Skipped already indexed: {skipped_files})")

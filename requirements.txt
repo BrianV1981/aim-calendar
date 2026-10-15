@@ -6,4 +6,7 @@ pyarrow
 pandas
 pyyaml
 openai
+google-genai
+google-auth
+pydantic
 
