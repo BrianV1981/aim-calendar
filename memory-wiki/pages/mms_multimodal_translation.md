@@ -1,22 +1,24 @@
-# Multimodal Rich Media Translation Pipeline
+# Multimodal Rich Media Translation Pipeline (`locomo-v2`)
 
 The A.I.M. Calendar project acts as the extraction and mapping layer for the **Visual Translation Cache**, resolving the inherent limitation of text-only RAG databases (like LanceDB) being unable to semantically query raw media.
 
 ## The Problem
 When extracting an Android XML backup (11GB+), roughly 99% of the file weight is composed of Base64 encoded payloads representing MMS attachments (such as group chat photos, videos, voice notes, vCards, or PDF documents). Discarding these attachments removes critical multimodal context from the user's timeline.
 
-## The Solution: Offline Multimodal Ground Truth
-Instead of relying on online cloud APIs, the architecture integrates directly with the user's `locomo-v2` architecture (Local Multimodal Conversational Memory).
+## The Solution: Hybrid & Offline Multimodal Ground Truth
+Implemented in **Issue #13** via `core/llm_provider.py` and `core/translate_media.py`, the architecture integrates the `locomo-v2` Visual Translation Cache directly into the Daily Notes and LanceDB pipeline.
 
-### 1. Base64 Extraction
-During Phase 3 (SMS Ingestion), the `iterparse` engine intercepts `<mms>` tags. Instead of dropping the data, it decodes the `data="..."` Base64 payload back into standard `.jpg`, `.mp4`, `.pdf`, or `.amr` files based on the `ct="mime/type"` attribute, saving them securely to the local `conversations/media/` directory.
+### 1. Base64 Extraction (`core/ingest_sms.py`)
+During Phase 3 (SMS Ingestion), the streaming `iterparse` engine intercepts `<mms>` tags. Instead of dropping the data, it decodes the `data="..."` Base64 payload back into standard `.jpg`, `.png`, `.gif`, `.webp`, `.mp4`, `.pdf`, `.vcf`, or `.amr` files based on the `ct="mime/type"` attribute, saving them with MD5 payload deduplication to `conversations/media/`.
 
 ### 2. Markdown Reference Mapping
-The ingestion script embeds a standard Markdown link (e.g., `![Media](media/mms_1609360272000.jpg)` or `[Document](media/mms_1609360272000.pdf)`) into the Daily Note precisely at the chronological timestamp where the file was sent/received, alongside the `<part text="...">` caption.
+`core/ingest_sms.py` embeds relative Markdown links (e.g., `![MMS Image](../media/mms_20260904_a1b2c3d4.jpg)` or `[MMS Video](../media/mms_20260904_e5f6g7h8.mp4)`) into the Daily Note (`conversations/daily_notes/YYYY-MM-DD.md`) at the exact chronological timestamp where the file was sent or received, alongside any text caption.
 
-### 3. Asynchronous Model Translation
-The `locomo-v2` daemon (running completely offline models like LLaVA-7B, Whisper, or MiniCPM-V) asynchronously scans the Daily Notes for new media links. When found, it executes a deep OCR/VQA pass over images, or transcription over audio/video, generating a rich text caption.
-This `llava_caption` (or transcript) is subsequently injected as a blockquote directly beneath the media in the Daily Note (e.g., `> [Visual Context: A video of a red sports car parked in front of a house.]`).
+### 3. Unified Provider & Asynchronous Media Translation (`core/translate_media.py`)
+`core/translate_media.py` scans `conversations/daily_notes/*.md` for media references and generates concise OCR/visual descriptions via `core/llm_provider.py` (`describe_media()`):
+*   **Provider Resolution (`AIM_LLM_PROVIDER=auto|ollama|gemini`):** Uses `gemini-2.5-flash` when `GEMINI_API_KEY` is configured, or falls back to local air-gapped Ollama (`qwen2.5vl:3b` for vision and `qwen3.5:4b` for text, extracting representative frames via `ffmpeg` for video attachments).
+*   **Persistent Cache (`conversations/media/.visual_translation_cache.json`):** Stores generated descriptions keyed by media filename and MD5/mtime so unchanged media files are never re-processed.
+*   **Blockquote Injection:** Injects `> [Visual Context: <description>]` directly beneath the media link in the Daily Note idempotently.
 
-### 4. Mathematical Integration
-When Phase 4 (LanceDB Injection) runs, it strictly ingests the generated text caption. This mathematically bridges the Multimodal gap, allowing the text-based RAG system to reliably retrieve images and visual memories based on semantic text queries.
+### 4. Incremental LanceDB Re-Indexing (`core/ingest_to_lancedb.py`)
+When `core/translate_media.py` modifies a Daily Note by injecting visual context, `core/ingest_to_lancedb.py` detects the updated file `mtime`/`size` against `.processed_lancedb_manifest.json`, deletes the stale fragments for that date, and re-embeds the enriched chunks into `talker_cartridge.lance`.

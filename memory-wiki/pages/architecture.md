@@ -2,7 +2,7 @@
 
 The primary goal of this repository is to process raw communications data (Phone Calls, Text Messages) and cleanly map them into the `aim-memory` RAG 5.21 schema for the Joshua OS.
 
-## The 4-Phase Ingestion Pipeline
+## The 7-Phase Ingestion & Synchronization Pipeline
 
 ### Phase 1: Classification (Complete)
 **Objective:** Prevent wasted compute by separating real conversations from noise.
@@ -18,15 +18,15 @@ The primary goal of this repository is to process raw communications data (Phone
 
 ### Phase 3: The Exocortex Lifelog (SMS, MMS & Call Ingestion) (Complete)
 **Objective:** Parse Android XML backups (SMS, MMS & Call Logs) and stitch them together with the Phase 2 Audio Transcripts into chronological timelines.
-**Process:** The system utilizes a streaming `iterparse` engine (`core/ingest_sms.py`) to process massive (10GB+) XML files without OOM crashes, tracking already-ingested backups via `.processed_xml_manifest.json`. It parses texts, calls, and decodes Base64 rich media attachments (images, videos, documents, audio) from `<mms>` tags into `conversations/media/` with MD5 payload deduplication. It also scans `conversations_diarized/*.md` (`ingest_diarized_transcripts`) and interleaves all communications and audio call transcripts in exact chronological order into single `YYYY-MM-DD.md` generic Markdown Daily Notes in `conversations/daily_notes/` while preserving multi-line media references, speaker previews, and captions.
+**Process:** The system utilizes a streaming `iterparse` engine (`core/ingest_sms.py`) to process massive (10GB+) XML files without OOM crashes, tracking already-ingested backups via `.processed_xml_manifest.json` and automatically pruning superseded cumulative XML/ZIP archives (`prune_superseded_backups()`). It parses texts, calls, and decodes Base64 rich media attachments (images, videos, documents, audio) from `<mms>` tags into `conversations/media/` with MD5 payload deduplication. Next, `core/translate_media.py` (`locomo-v2`) generates OCR/visual descriptions via `core/llm_provider.py`, caches them in `.visual_translation_cache.json`, and injects `> [Visual Context: ...]` blockquotes beneath media links. Finally, `ingest_diarized_transcripts` interleaves speaker-diarized call transcripts (`conversations_diarized/*.md`) in exact chronological order into single `YYYY-MM-DD.md` generic Markdown Daily Notes in `conversations/daily_notes/`.
 
 ### Phase 4: LanceDB Vector Injection (Markdown RAG) (Complete)
 **Objective:** Inject the completely unified Daily Notes into the RAG vector database.
-**Process:** The system utilizes `core/ingest_to_lancedb.py` to parse chronological Daily Notes (`YYYY-MM-DD.md`), apply sliding-window chunking anchored with `[Date: YYYY-MM-DD]`, preserve multi-line entry blocks, and generate 768-dim `nomic-embed-text` embeddings. Vectors are inserted into `talker_cartridge.lance` under table `fragments` (`type: "daily_note"`) with full idempotency tracking, table optimization, and FTS indexing. This allows semantic retrieval across dates, SMS, calls, and transcripts simultaneously.
+**Process:** The system utilizes `core/ingest_to_lancedb.py` to parse chronological Daily Notes (`YYYY-MM-DD.md`), apply sliding-window chunking anchored with `[Date: YYYY-MM-DD]`, preserve multi-line entry blocks (including `> [Visual Context: ...]` translations), and generate 768-dim `nomic-embed-text` embeddings. File mtime and byte size are tracked in `.processed_lancedb_manifest.json` so Daily Notes updated with new communications or visual translations are automatically re-indexed in `talker_cartridge.lance` (`type: "daily_note"`), followed by table optimization and FTS indexing.
 
 ### Phase 5: Background Sync Daemon (Complete)
 **Objective:** Eliminate manual sync steps by continuously synchronizing cloud backups to the local filesystem.
-**Process:** The background sync daemon (`core/sync_daemon.sh`) orchestrates `rclone` synchronization from Google Drive into `TalkerACR/` and `conversations/sms_raw/`. It features flock-based lock safety, auto-unzipping of new archive backups, user-level systemd timer integration (`aim-sync.timer`, running every 15 minutes), and automatic incremental downstream pipeline triggering (`core/ingest_sms.py` -> `core/ingest_to_lancedb.py`, plus full audio pipeline chaining when `--run-diarize` is enabled) when new communications records are detected.
+**Process:** The background sync daemon (`core/sync_daemon.sh`) orchestrates `rclone` synchronization from Google Drive into `TalkerACR/` and `conversations/sms_raw/` using manifest-driven `--exclude-from` filters so pruned cumulative backups are never re-downloaded. It features flock-based lock safety, single-line journal/inode log deduplication, auto-unzipping of new archive backups, user-level systemd timer integration (`aim-sync.timer`, running every 15 minutes), and automatic incremental downstream pipeline chaining (`ingest_sms.py` -> `translate_media.py` -> `ingest_to_lancedb.py` -> `calendar_sync.py`, plus full audio diarization chaining when `--run-diarize` is enabled).
 
 ### Phase 6: Obsidian Calendar UI & Vault Integration (Complete)
 **Objective:** Provide a frictionless, beautiful graphical timeline for browsing communications logs.
@@ -38,10 +38,10 @@ The primary goal of this repository is to process raw communications data (Phone
 
 Agents relying on LanceDB (`talker_cartridge.lance`) for RAG retrieval must understand the **temporal horizon** of the dataset.
 
-*   **The Horizon Limit:** A LanceDB query will only return results up to the date of the last successful Phase 2 execution. If a user asks about a conversation that occurred *after* the last sync date, the system is fundamentally blind to it.
+*   **The Horizon Limit:** A LanceDB query will only return results up to the date of the last successful sync and ingestion run. If a user asks about a conversation that occurred *after* the last sync date, the system is fundamentally blind to it.
 *   **The Sync Daemon (Issue #4):** Resolved via `core/sync_daemon.sh` and `aim-sync.timer`. The daemon automatically pulls new raw audio and SMS files from Google Drive into local storage and triggers the ingestion pipeline without manual intervention.
-*   **Continuous Integration:** With automatic background synchronization active, incremental calls and texts are converted to Daily Notes and ready for Phase 4 LanceDB vectorization, keeping the agent's memory aligned with real time.
+*   **Continuous Integration:** With automatic background synchronization active, incremental calls, texts, and visual translations are converted to Daily Notes and vectorized into LanceDB, keeping the agent's memory aligned with real time.
 
-### Phase 7: Cloud / Bi-Directional Synchronization (Phase 3 Roadmap)
-**Objective:** Export the insights and timelines generated by the local Exocortex back to cloud services for mobile/ubiquitous access.
-**Process:** This is the planned roadmap for bi-directional syncing. Future modules will read the chronological `YYYY-MM-DD.md` files or query the `talker_cartridge.lance` database to push structured events, daily summaries, and strategic briefings out to external APIs (e.g., Google Calendar API, Notion, or a dedicated web UI), bridging the gap between the secure offline local-first vault and the cloud.
+### Phase 7: Calendar Intelligence & Cloud Synchronization (Complete)
+**Objective:** Synthesize Daily Notes into structured retrospective dossiers and prospective appointments, exporting them to local `.ics` feeds and Google Calendar API v3.
+**Process:** Implemented in `core/calendar_sync.py` (Issue #14). The engine filters out `GARBAGE` entries, routes clean Daily Notes through `core/llm_provider.py`, and separates outputs into two tracks: **Retrospective Daily Dossiers** (`A.I.M. Activity Log`) and **Prospective Appointments** (`A.I.M. Appointments`). State is persisted in `conversations/calendar/.calendar_state.json`, exported to RFC-5545 `.ics` files (`aim_activity_log.ics`, `aim_appointments.ics`), and idempotently upserted to Google Calendar using deterministic 24-hex `extendedProperties.private.aim_event_id` hashes. *(See [Calendar Intelligence & Cloud Synchronization](calendar_intelligence_sync.md) for full details).*
