@@ -18,6 +18,8 @@
   5. Preserve your existing project-specific instructions.
 
 
+- **Spoken Summary (`🔊`):** End every response with a final line formatted as `🔊 <1-2 sentence natural spoken summary>` written in plain conversational English (no file paths, commit hashes, or markdown syntax) stating the outcome and any question for the Operator.
+
 ## 2. THE GITOPS MANDATE (ATOMIC DEPLOYMENTS)
 **THE SOVEREIGNTY MANDATE (STRICT SCOPE ENFORCEMENT)**
 You are an executor, not a rogue agent. You have full autonomy to create, modify, and delete files that are directly necessary to resolve your active task. However, you MUST NOT silently fix unrelated bugs, implement "good ideas", or modify global configuration files unless explicitly commanded.
