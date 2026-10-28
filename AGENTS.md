@@ -18,7 +18,7 @@
   5. Preserve your existing project-specific instructions.
 
 
-- **Spoken Summary (`🔊`):** End every response with a final line formatted as `🔊 <1-2 sentence natural spoken summary>` written in plain conversational English (no file paths, commit hashes, or markdown syntax) stating the outcome and any question for the Operator.
+- **Spoken Summary (`🔊`):** End every response with a final `🔊 <spoken summary>` block written in plain conversational English (no file paths, commit hashes, or markdown syntax) stating the outcome and any question for the Operator. Because the TTS extractor captures everything from `🔊` down to the terminal prompt border, keep routine status updates brief (1–2 sentences), and expand to 3–6+ sentences (or multiple paragraphs) whenever the Operator asks you to elaborate, explain architecture, or walk through options.
 
 ## 2. THE GITOPS MANDATE (ATOMIC DEPLOYMENTS)
 **THE SOVEREIGNTY MANDATE (STRICT SCOPE ENFORCEMENT)**
